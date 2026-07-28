@@ -35,7 +35,7 @@
   "scripts": {
     "dev": "bun run src/cli/index.ts start",
     "dev:proxy": "bun run src/cli/index.ts start",
-    "dev:gui": "cd gui && bun run dev",
+    "dev:gui": "cd gui && OPENCODEX_PROXY_TARGET=http://127.0.0.1:10100 bun run dev",
     "start": "bun run src/cli/index.ts start",
     "test": "bun scripts/test.ts",
     "typecheck": "bun x tsc --noEmit",
