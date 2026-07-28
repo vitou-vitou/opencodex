@@ -32,7 +32,7 @@ export type KiroDiagnosticStatus =
   | "registration_found";
 
 export interface KiroImportDiagnostic {
-  location: "kiro-creds-file" | "kiro-cli-db-env" | "kiro-cli-data" | "kiro-cli-linux-data" | "amazon-q-data" | "kiro-sso-cache";
+  location: "kiro-creds-file" | "kiro-cli-db-env" | "kiro-cli-data" | "kiro-cli-linux-data" | "kiro-cli-windows-data" | "amazon-q-data" | "kiro-sso-cache";
   status: KiroDiagnosticStatus;
 }
 
@@ -112,8 +112,10 @@ function sqliteEntries(): Array<{ location: KiroImportDiagnostic["location"]; pa
   const home = userHome();
   const configured = process.env.KIROCLI_DB_PATH?.trim() || process.env.KIRO_CLI_DB_FILE?.trim();
   if (configured) return [{ location: "kiro-cli-db-env", path: expandPath(configured) }];
+  const localAppData = process.env.LOCALAPPDATA || join(home, "AppData", "Local");
   return [
     { location: "kiro-cli-data", path: join(home, "Library", "Application Support", "kiro-cli", "data.sqlite3") },
+    { location: "kiro-cli-windows-data", path: join(localAppData, "kiro-cli", "data.sqlite3") },
     { location: "kiro-cli-linux-data", path: join(home, ".local", "share", "kiro-cli", "data.sqlite3") },
     { location: "amazon-q-data", path: join(home, ".local", "share", "amazon-q", "data.sqlite3") },
     { location: "kiro-sso-cache", path: join(home, ".kiro", "sso", "cache.db") },

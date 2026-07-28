@@ -11,6 +11,7 @@ const origHome = process.env.HOME;
 const origOcxHome = process.env.OPENCODEX_HOME;
 const origRegion = process.env.KIRO_REGION;
 const origClaudeConfigDir = process.env.CLAUDE_CONFIG_DIR;
+const origLocalAppData = process.env.LOCALAPPDATA;
 const origFetch = globalThis.fetch;
 const origWarn = console.warn;
 let tmp: string;
@@ -22,6 +23,7 @@ beforeEach(() => {
   process.env.OPENCODEX_HOME = join(tmp, "ocx");
   process.env.KIRO_REGION = "us-east-1";
   process.env.CLAUDE_CONFIG_DIR = join(tmp, ".claude");
+  delete process.env.LOCALAPPDATA;
 });
 
 afterEach(() => {
@@ -29,6 +31,7 @@ afterEach(() => {
   if (origOcxHome === undefined) delete process.env.OPENCODEX_HOME; else process.env.OPENCODEX_HOME = origOcxHome;
   if (origRegion === undefined) delete process.env.KIRO_REGION; else process.env.KIRO_REGION = origRegion;
   if (origClaudeConfigDir === undefined) delete process.env.CLAUDE_CONFIG_DIR; else process.env.CLAUDE_CONFIG_DIR = origClaudeConfigDir;
+  if (origLocalAppData === undefined) delete process.env.LOCALAPPDATA; else process.env.LOCALAPPDATA = origLocalAppData;
   globalThis.fetch = origFetch;
   console.warn = origWarn;
   rmSync(tmp, { recursive: true, force: true });

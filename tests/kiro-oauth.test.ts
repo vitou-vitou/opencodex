@@ -19,6 +19,7 @@ const origCredentialsFile = process.env.KIRO_CREDENTIALS_FILE;
 const origCliDbFile = process.env.KIRO_CLI_DB_FILE;
 const origCliDbPath = process.env.KIROCLI_DB_PATH;
 const origCliTokenKey = process.env.KIROCLI_TOKEN_KEY;
+const origLocalAppData = process.env.LOCALAPPDATA;
 const origFetch = globalThis.fetch;
 const warnSpies: Array<ReturnType<typeof spyOn>> = [];
 let tmp: string;
@@ -41,6 +42,7 @@ beforeEach(() => {
   delete process.env.KIRO_CLI_DB_FILE;
   delete process.env.KIROCLI_DB_PATH;
   delete process.env.KIROCLI_TOKEN_KEY;
+  delete process.env.LOCALAPPDATA;
 });
 afterEach(() => {
   for (const warning of warnSpies.splice(0)) warning.mockRestore();
@@ -64,6 +66,8 @@ afterEach(() => {
   else process.env.KIROCLI_DB_PATH = origCliDbPath;
   if (origCliTokenKey === undefined) delete process.env.KIROCLI_TOKEN_KEY;
   else process.env.KIROCLI_TOKEN_KEY = origCliTokenKey;
+  if (origLocalAppData === undefined) delete process.env.LOCALAPPDATA;
+  else process.env.LOCALAPPDATA = origLocalAppData;
   globalThis.fetch = origFetch;
   rmSync(tmp, { recursive: true, force: true });
 });
