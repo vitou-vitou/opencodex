@@ -892,6 +892,19 @@ function taskXmlString(value: string): string {
     .replace(/'/g, "&apos;");
 }
 
+/**
+ * Escapes for XML *text* content rather than an attribute value — `"` and `'` need no
+ * escaping there. Task Scheduler re-serializes a queried task's <Arguments> text with a
+ * literal `"`, so windowsTaskRegistrationHealthy() must compare against this form, not
+ * taskXmlString()'s attribute-safe (but here over-escaped) &quot;.
+ */
+function taskXmlTextString(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
 export function buildWindowsServiceScript(entry = cliEntry(), port = resolveServiceListenPort()): string {
   const { bun, cli } = entry;
   const bunRuntime = durableBunRuntime();
@@ -1076,8 +1089,8 @@ export function windowsTaskRegistrationHealthy(
     && taskXmlOptionalValueEquals(settings, "Enabled", "true")
     && /<MultipleInstancesPolicy>\s*IgnoreNew\s*<\/MultipleInstancesPolicy>/i.test(settings)
     && /<ExecutionTimeLimit>\s*PT0S\s*<\/ExecutionTimeLimit>/i.test(settings)
-    && action.includes(`<Command>${taskXmlString(wscript)}</Command>`)
-    && action.includes(`<Arguments>${taskXmlString(`/b /nologo "${launcher}"`)}</Arguments>`);
+    && action.includes(`<Command>${taskXmlTextString(wscript)}</Command>`)
+    && action.includes(`<Arguments>${taskXmlTextString(`/b /nologo "${launcher}"`)}</Arguments>`);
 }
 
 export interface WindowsSchedulerXmlState {
