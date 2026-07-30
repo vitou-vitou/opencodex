@@ -70,6 +70,18 @@ Full policy: [references/framework-best-used.md](references/framework-best-used.
 
 **Never** replace Superpowers with wholesale ECC in this triad. Skills that are only polite suggestions are decoration.
 
+## Chat intent router
+
+Full policy: [references/chat-intent-router.md](references/chat-intent-router.md).
+
+| Mode | Stack |
+|------|-------|
+| Plan new project | Spec-Kit + Superpowers |
+| Maintain project | OpenSpec + Superpowers |
+| Fix bug | Superpowers debug/verify |
+| Explorer | Read-only + **Top-3 by stars**: Firecrawl (~158k), Context7 (~60k), last30days (~55k) |
+| Developer | Superpowers implement (+ ECC cherry-pick if gap) |
+
 ---
 
 ## Recommended workflows
@@ -185,3 +197,4 @@ Use laravel-ui-phase: AI pick my UI for examples/marketplace-v2 — all pages.
 - Caveman: https://github.com/JuliusBrussee/caveman (Matt Pocock-style token compression; includes cavecrew subagents)
 - Sync manifest: `docs/CURSOR_SKILLS_SYNC.md` (in laravel13.x)
 - Framework best-used: [references/framework-best-used.md](references/framework-best-used.md)
+- Chat intent router: [references/chat-intent-router.md](references/chat-intent-router.md)
