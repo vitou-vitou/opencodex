@@ -52,7 +52,23 @@ Need structured SDD?
 NEVER combine spec-kit + openspec (overlapping SDD — pick one)
 ALWAYS add superpowers for implementation quality
 OPTIONALLY add caveman for token-efficient voice (does not replace SDD or Superpowers)
+ECC / gstack: see [references/framework-best-used.md](references/framework-best-used.md) — Superpowers stays spine; ECC cherry-pick only (Nebutra)
 ```
+
+---
+
+## Framework best-used (Superpowers · ECC · gstack)
+
+Full policy: [references/framework-best-used.md](references/framework-best-used.md) · source [Nebutra autopsy](https://nebutra.com/blog/claude-code-skill-frameworks-autopsy).
+
+| Workflow | Best used |
+|----------|-----------|
+| Team / shared PR | **Superpowers** skeleton + ECC `tdd-workflow` / `eval-harness` only |
+| Solo fast ship | gstack OK; ECC minimal; Superpowers if jump-to-code is the failure mode |
+| Legacy refactor | Superpowers `systematic-debugging` + `verification-before-completion` (+ ECC `tdd-workflow`) |
+| Learning | Superpowers gates; ECC as reference book — no full install |
+
+**Never** replace Superpowers with wholesale ECC in this triad. Skills that are only polite suggestions are decoration.
 
 ---
 
@@ -164,5 +180,8 @@ Use laravel-ui-phase: AI pick my UI for examples/marketplace-v2 — all pages.
 - Spec-Kit: https://github.com/github/spec-kit
 - OpenSpec: https://github.com/Fission-AI/OpenSpec
 - Superpowers: https://github.com/obra/superpowers
+- ECC: https://github.com/affaan-m/ECC (cherry-pick only)
+- Framework autopsy: https://nebutra.com/blog/claude-code-skill-frameworks-autopsy
 - Caveman: https://github.com/JuliusBrussee/caveman (Matt Pocock-style token compression; includes cavecrew subagents)
 - Sync manifest: `docs/CURSOR_SKILLS_SYNC.md` (in laravel13.x)
+- Framework best-used: [references/framework-best-used.md](references/framework-best-used.md)
