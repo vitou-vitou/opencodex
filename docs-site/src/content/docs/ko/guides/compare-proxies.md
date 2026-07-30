@@ -73,6 +73,18 @@ vLLM/Bedrock/혼합 백엔드 앞 프로토콜 변환이 주 목적인 경우.
 **대신 opencodex:** Codex/Claude Code 중심 레지스트리, 계정 풀, 대시보드가 필요할 때. opencodex에도
 [사이드카](/ko/guides/sidecars/)가 있지만 제품 초점은 다릅니다.
 
+## 멀티 계정: 서로 다른 두 가지 일
+
+“여러 Codex 계정”은 보통 둘 중 하나입니다. 섞지 마세요.
+
+| 일 | 패턴 | 예 |
+| --- | --- | --- |
+| **병렬 플릿** | N 계정 × N 동시 에이전트 | Star Fleet 스타일 하네스(병렬 에이전트당 계정 하나) |
+| **할당량 풀** | 활성 Codex 경로 하나; 429/할당량 시 전환 + thread affinity | opencodex Codex Auth; `codex-rotate` 같은 로컬 `auth.json` 로테이터 |
+
+opencodex는 **할당량 풀**을 구현합니다. 기존 thread는 한 계정에 머물고, 새 세션은 사용량·cooldown·상태에 따라
+재분배될 수 있습니다. 병렬 멀티 계정 오케스트레이터가 아닙니다.
+
 ## 근처 도구
 
 [1rgs/claude-code-proxy](https://github.com/1rgs/claude-code-proxy)(~3.7k)는 Claude Code를 OpenAI형

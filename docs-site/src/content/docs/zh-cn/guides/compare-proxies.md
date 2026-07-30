@@ -69,6 +69,17 @@ vLLM 等标准化为 OpenAI 形态 API。
 **改选 opencodex：** 你需要以 Codex/Claude Code 为中心的注册表、账号池与仪表盘。opencodex 也有
 [边车](/zh-cn/guides/sidecars/)，但产品重心不同。
 
+## 多账号：两种不同工作
+
+“多个 Codex 账号”通常指下面两种之一——不要混为一谈：
+
+| 工作 | 模式 | 示例 |
+| --- | --- | --- |
+| **并行舰队** | N 账号 × N 并发智能体 | Star Fleet 风格编排（每个并行智能体一个账号） |
+| **配额池** | 一条活跃 Codex 路径；遇 429/配额切换并保留线程亲和 | opencodex Codex Auth；如 `codex-rotate` 的本地 `auth.json` 轮换 |
+
+opencodex 实现的是**配额池**。已有线程留在同一账号；新会话可按用量、冷却与健康再平衡。它不是并行多账号编排器。
+
 ## 相近工具
 
 [1rgs/claude-code-proxy](https://github.com/1rgs/claude-code-proxy)（~3.7k）侧重让 Claude Code

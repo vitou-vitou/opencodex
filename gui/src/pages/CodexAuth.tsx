@@ -24,7 +24,10 @@ export function OpenAiAccountModeBanner({
         {state === "direct" && <span className="badge badge-green">{t("codexAuth.accountModeDirect")}</span>}
       </div>
       {state === "pool" && (
-        <p className="card-sub" style={{ margin: "6px 0 0" }}>{t("codexAuth.accountModePoolDesc")}</p>
+        <>
+          <p className="card-sub" style={{ margin: "6px 0 0" }}>{t("codexAuth.accountModePoolDesc")}</p>
+          <p className="card-sub faint" style={{ margin: "6px 0 0" }}>{t("codexAuth.poolNotParallelNote")}</p>
+        </>
       )}
       {state === "direct" && (
         <p className="card-sub" style={{ margin: "6px 0 0" }}>

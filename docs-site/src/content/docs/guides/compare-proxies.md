@@ -89,6 +89,18 @@ upstream model lacks them.
 pool, and dashboard; opencodex also has [sidecars](/guides/sidecars/) for web search and vision, but
 the product focus differs.
 
+## Multi-account: two different jobs
+
+“Multiple Codex accounts” usually means one of two things — do not mix them up:
+
+| Job | Pattern | Example |
+| --- | --- | --- |
+| **Parallel fleet** | N accounts × N concurrent agents on separate work | Star Fleet–style harnesses (one account per parallel agent) |
+| **Quota pool** | One active Codex path; switch on 429 / quota with thread affinity | opencodex Codex Auth; local `auth.json` rotators such as `codex-rotate` |
+
+opencodex implements the **quota pool**. Existing threads stay on one account; new sessions can
+rebalance by usage, cooldown, and health. It is not a parallel multi-account orchestrator.
+
 ## Also nearby
 
 [1rgs/claude-code-proxy](https://github.com/1rgs/claude-code-proxy) (~3.7k stars) focuses on running

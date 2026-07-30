@@ -74,6 +74,18 @@ vLLM などを OpenAI 形で標準化したい。
 **代わりに opencodex:** Codex/Claude Code 中心のレジストリ、アカウントプール、ダッシュボードが欲しいとき。
 opencodex にも [サイドカー](/ja/guides/sidecars/) がありますが製品の焦点は異なります。
 
+## マルチアカウント: 二つの異なる仕事
+
+「複数の Codex アカウント」はだいたい次のどちらかです。混同しないでください。
+
+| 仕事 | パターン | 例 |
+| --- | --- | --- |
+| **並列フリート** | N アカウント × N 並列エージェント | Star Fleet 風ハーネス（並列エージェントごとにアカウント） |
+| **クォータプール** | アクティブな Codex 経路は 1 本；429 / クォータで切替 + thread affinity | opencodex Codex Auth；`codex-rotate` のようなローカル `auth.json` ローテーター |
+
+opencodex が実装するのは **クォータプール**です。既存スレッドは 1 アカウントに留まり、新規セッションは
+使用量・クールダウン・健全性で再配分できます。並列マルチアカウントのオーケストレータではありません。
+
 ## 近くのツール
 
 [1rgs/claude-code-proxy](https://github.com/1rgs/claude-code-proxy)（~3.7k）は Claude Code を
