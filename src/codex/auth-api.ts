@@ -538,8 +538,9 @@ export async function listCodexAuthAccounts(config: OcxConfig, forceRefresh = fa
     accountId: MAIN_CODEX_ACCOUNT_ID,
     needsReauth: mainNeedsReauth,
   });
-  const mainQuota = mainInfo.quota
-    ? { ...quotaForPlan({ ...mainInfo.quota, updatedAt: Date.now() }, mainInfo.plan) }
+  const mainQuotaTimestamp = getMainAccountInfoCache()?.ts;
+  const mainQuota = mainInfo.quota && mainQuotaTimestamp !== undefined
+    ? { ...quotaForPlan({ ...mainInfo.quota, updatedAt: mainQuotaTimestamp }, mainInfo.plan) }
     : null;
   const mainRecovery = quotaRecoveryForAccount(mainQuota, threshold, hasMainCredential, mainNeedsReauth);
   const main: CodexAuthAccountDto = {

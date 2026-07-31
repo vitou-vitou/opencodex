@@ -27,6 +27,7 @@ import {
   reconcileMainCodexAccountRuntimeState,
   resetMainCodexAccountIdentityTrackingForTests,
 } from "../src/codex/account-lifecycle";
+import { clearMainAccountInfoCache, setMainAccountInfoCache } from "../src/codex/main-account-cache";
 
 const TEST_DIR = join(import.meta.dir, ".tmp-codex-auth-api-test");
 const TEST_CODEX_HOME = join(TEST_DIR, "codex");
@@ -117,6 +118,7 @@ beforeEach(() => {
   clearAccountNeedsReauth("__main__");
   clearAccountQuota();
   clearAccountNeedsReauth(MAIN_CODEX_ACCOUNT_ID);
+  clearMainAccountInfoCache();
   clearCodexWebSocketRegistry();
   resetMainCodexAccountIdentityTrackingForTests();
 });
@@ -125,6 +127,7 @@ afterEach(() => {
   clearAccountNeedsReauth("__main__");
   clearAccountQuota();
   clearAccountNeedsReauth(MAIN_CODEX_ACCOUNT_ID);
+  clearMainAccountInfoCache();
   clearCodexWebSocketRegistry();
   globalThis.fetch = previousFetch;
   if (previousOpencodexHome === undefined) delete process.env.OPENCODEX_HOME;
@@ -1626,6 +1629,63 @@ describe("codex-auth API", () => {
     expect(serialized).not.toContain("refresh-recovery-secret");
     expect(serialized).not.toContain("acct-recovery-raw-id");
     expect(serialized).not.toContain("recovery-owner@example.test");
+  });
+
+  test("GET /api/codex-auth/accounts projects main quota health and recovery eligibility", async () => {
+    writeFileSync(join(TEST_CODEX_HOME, "auth.json"), JSON.stringify({
+      tokens: { access_token: "main-recovery-access", account_id: "main-recovery-id" },
+    }));
+    setMainAccountInfoCache({
+      email: "main-recovery@example.test",
+      plan: "pro",
+      quota: {
+        weeklyPercent: 91,
+        weeklyResetAt: 1_800_000_000_000,
+        monthlyPercent: 20,
+        monthlyResetAt: 1_900_000_000_000,
+      },
+      ts: Date.now() - 60_000,
+    });
+
+    const req = new Request("http://localhost/api/codex-auth/accounts", { method: "GET" });
+    const resp = await handleCodexAuthAPI(req, new URL(req.url), makeConfig({ autoSwitchThreshold: 80 }));
+    const data = await resp!.json() as { accounts: Array<{ id: string; quotaHealth: unknown; recoveryEligible: unknown }> };
+    const main = data.accounts.find(account => account.id === MAIN_CODEX_ACCOUNT_ID);
+
+    expect(main).toMatchObject({
+      quotaHealth: {
+        status: "critical",
+        percent: 91,
+        windowLabel: "weekly",
+        resetAt: 1_800_000_000_000,
+        action: "switch_account",
+      },
+      recoveryEligible: true,
+    });
+  });
+
+  test("GET /api/codex-auth/accounts marks stale cached main quota for refresh", async () => {
+    setMainAccountInfoCache({
+      email: "stale-main@example.test",
+      plan: "pro",
+      quota: { weeklyPercent: 91, weeklyResetAt: 1_800_000_000_000 },
+      ts: Date.now() - 6 * 60_000,
+    });
+    writeFileSync(join(TEST_CODEX_HOME, "auth.json"), "{");
+
+    const req = new Request("http://localhost/api/codex-auth/accounts", { method: "GET" });
+    const resp = await handleCodexAuthAPI(req, new URL(req.url), makeConfig({ autoSwitchThreshold: 80 }));
+    const data = await resp!.json() as { accounts: Array<{ id: string; quotaHealth: unknown; recoveryEligible: unknown }> };
+    const main = data.accounts.find(account => account.id === MAIN_CODEX_ACCOUNT_ID);
+
+    expect(main).toMatchObject({
+      quotaHealth: {
+        status: "unknown",
+        stale: true,
+        action: "refresh",
+      },
+      recoveryEligible: false,
+    });
   });
 
   test("GET /api/codex-auth/accounts does not mark reauth on refresh generation conflict", async () => {
