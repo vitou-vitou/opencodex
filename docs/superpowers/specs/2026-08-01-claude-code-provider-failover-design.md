@@ -162,6 +162,7 @@ ocx claude use <provider>            # soft pin (hot, no restart)
 ocx claude use <provider> --hard     # hard lock
 ocx claude use auto                  # clear pin -> full auto-failover
 ocx claude route status              # chains, pin, live per-candidate health/cooldowns
+ocx claude route clear-cooldowns     # explicit manual reset of live cooldowns
 ```
 
 **Management API (hot-reload; backs CLI + future GUI):**
@@ -203,7 +204,10 @@ selector. The reactive hop wraps the Claude forward in the `/v1/messages` handle
 - `ocx observe claude-inbound` — chosen candidate + hop reason per request.
 - Log line per hop: `route hop opus: anthropic->kiro (429, cool 42s)`.
 
-## Open questions for spec review
+## Resolved defaults (approved 2026-08-01)
 
-- Default `threshold` (90?) and default cooldown TTLs (60s/30s) — tune later or set now?
-- Should `ocx claude use auto` also clear all live cooldowns (force fresh evaluation), or only the pin?
+- **`threshold` = 90**; cooldown TTLs **429 → 60s**, **5xx/network → 30s**, **401/auth → 60s**
+  (Retry-After / quota `resetAt` override when present). All tunable via `claudeCode.routing`.
+- **`ocx claude use auto` clears the pin only** — live cooldowns reflect real upstream limits;
+  wiping them would instantly re-hit the wall. A separate `ocx claude route clear-cooldowns`
+  provides an explicit manual reset when needed.
