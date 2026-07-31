@@ -1,1 +1,6 @@
-export type { CodexAccountEntry } from "../hooks/useCodexAccountPool";
+export type {
+  CodexAccountEntry,
+  CodexQuotaHealth,
+  CodexQuotaHealthStatus,
+  CodexQuotaRecoveryCandidate,
+} from "../hooks/useCodexAccountPool";

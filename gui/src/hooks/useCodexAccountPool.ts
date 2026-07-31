@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AccountQuota } from "../codex-quota-utils";
 import { accountNeedsReauth } from "../oauth-health-display";
 
@@ -28,7 +28,26 @@ export interface CodexAccountEntry {
   healthLabel?: string;
   healthSummary?: string;
   healthAction?: string;
+  quotaHealth?: CodexQuotaHealth;
+  recoveryEligible?: boolean;
 }
+
+export type CodexQuotaHealthStatus = "healthy" | "warning" | "critical" | "exhausted" | "unknown";
+
+export interface CodexQuotaHealth {
+  status: CodexQuotaHealthStatus;
+  percent?: number;
+  windowLabel?: string;
+  resetAt?: number;
+  updatedAt?: number;
+  stale: boolean;
+  action: "none" | "refresh" | "switch_account" | "wait_for_reset";
+}
+
+export type CodexQuotaRecoveryCandidate = CodexAccountEntry & {
+  quotaHealth: CodexQuotaHealth;
+  recoveryEligible: boolean;
+};
 
 export type CodexAccountLoadState = "loading" | "ready" | "error";
 
@@ -57,6 +76,7 @@ export interface CodexAccountPoolController {
   loadState: CodexAccountLoadState;
   switchingId: string | null;
   activeNeedsReauth: boolean;
+  recoveryCandidates: CodexQuotaRecoveryCandidate[];
 
   load(refreshQuota?: boolean): Promise<boolean>;
   switchAccount(id: string | null): Promise<CodexAccountActionResult<{ activeId: string | null }>>;
@@ -72,6 +92,63 @@ export interface CodexAccountPoolController {
 }
 
 const REFRESH_INTERVAL_MS = 30_000;
+
+const UNKNOWN_QUOTA_HEALTH: CodexQuotaHealth = {
+  status: "unknown",
+  stale: true,
+  action: "refresh",
+};
+
+function quotaHealthFor(account: CodexAccountEntry): CodexQuotaHealth {
+  const health = account.quotaHealth;
+  if (!health) return UNKNOWN_QUOTA_HEALTH;
+  const status: CodexQuotaHealthStatus = ["healthy", "warning", "critical", "exhausted", "unknown"].includes(health.status)
+    ? health.status
+    : "unknown";
+  const action = ["none", "refresh", "switch_account", "wait_for_reset"].includes(health.action)
+    ? health.action
+    : "refresh";
+  return {
+    status,
+    ...(typeof health.percent === "number" && Number.isFinite(health.percent) ? { percent: health.percent } : {}),
+    ...(typeof health.windowLabel === "string" ? { windowLabel: health.windowLabel } : {}),
+    ...(typeof health.resetAt === "number" && Number.isFinite(health.resetAt) ? { resetAt: health.resetAt } : {}),
+    ...(typeof health.updatedAt === "number" && Number.isFinite(health.updatedAt) ? { updatedAt: health.updatedAt } : {}),
+    stale: Boolean(health.stale),
+    action,
+  };
+}
+
+function normalizeAccount(account: CodexAccountEntry): CodexAccountEntry {
+  return {
+    ...account,
+    quotaHealth: quotaHealthFor(account),
+    recoveryEligible: Boolean(account.recoveryEligible),
+  };
+}
+
+function recoveryCandidatesFor(accounts: CodexAccountEntry[], activeId: string | null): CodexQuotaRecoveryCandidate[] {
+  return accounts.map(account => {
+    const quotaHealth = quotaHealthFor(account);
+    const recoveryEligible = Boolean(account.recoveryEligible)
+      && account.hasCredential
+      && !accountNeedsReauth(account)
+      && quotaHealth.status !== "exhausted"
+      && quotaHealth.status !== "unknown";
+    return { ...account, quotaHealth, recoveryEligible };
+  }).sort((left, right) => {
+    if (left.recoveryEligible !== right.recoveryEligible) return left.recoveryEligible ? -1 : 1;
+    const leftPercent = left.quotaHealth.percent ?? Number.POSITIVE_INFINITY;
+    const rightPercent = right.quotaHealth.percent ?? Number.POSITIVE_INFINITY;
+    if (leftPercent !== rightPercent) return leftPercent - rightPercent;
+    const leftReset = left.quotaHealth.resetAt ?? Number.POSITIVE_INFINITY;
+    const rightReset = right.quotaHealth.resetAt ?? Number.POSITIVE_INFINITY;
+    if (leftReset !== rightReset) return leftReset - rightReset;
+    const isLeftActive = activeId === "__main__" ? left.isMain : left.id === activeId;
+    const isRightActive = activeId === "__main__" ? right.isMain : right.id === activeId;
+    return Number(isLeftActive) - Number(isRightActive);
+  });
+}
 
 export function useCodexAccountPool(apiBase: string, enabled = true): CodexAccountPoolController {
   const [accounts, setAccounts] = useState<CodexAccountEntry[]>([]);
@@ -113,7 +190,10 @@ export function useCodexAccountPool(apiBase: string, enabled = true): CodexAccou
         const response = await fetch(`${apiBase}/api/codex-auth/accounts${refreshQuota ? "?refresh=1" : ""}`);
         if (!response.ok) throw new Error("account load failed");
         const payload = await response.json();
-        if (loadGenerationRef.current === generation) setAccounts(payload.accounts ?? []);
+        if (loadGenerationRef.current === generation) {
+          const rows = Array.isArray(payload.accounts) ? payload.accounts as CodexAccountEntry[] : [];
+          setAccounts(rows.map(normalizeAccount));
+        }
         return true;
       } catch {
         return false;
@@ -255,6 +335,10 @@ export function useCodexAccountPool(apiBase: string, enabled = true): CodexAccou
   const mainAccount = accounts.find(a => a.isMain);
   // Include health-only reauth so Providers overview attention matches row CTAs.
   const activeNeedsReauth = accountNeedsReauth(activePoolAccount ?? mainAccount);
+  const recoveryCandidates = useMemo(
+    () => recoveryCandidatesFor(accounts, activeId),
+    [accounts, activeId],
+  );
 
   return {
     accounts,
@@ -262,6 +346,7 @@ export function useCodexAccountPool(apiBase: string, enabled = true): CodexAccou
     loadState,
     switchingId,
     activeNeedsReauth,
+    recoveryCandidates,
     load,
     switchAccount,
     saveAlias,

@@ -100,6 +100,15 @@ test("the controller loads once on mount", async () => {
   expect(seen.current!.loadState).toBe("ready");
 });
 
+test("normalizes an older account response without quota recovery health", async () => {
+  const seen = await mountController();
+  expect(seen.current!.accounts[0]?.quotaHealth).toEqual({
+    status: "unknown",
+    stale: true,
+    action: "refresh",
+  });
+});
+
 test("an inert controller issues no requests at all", async () => {
   await mountController(false);
   expect(calls.length).toBe(0);

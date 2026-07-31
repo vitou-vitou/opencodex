@@ -10,6 +10,7 @@ import CodexAutoSwitchSetting from "./CodexAutoSwitchSetting";
 import { useCodexAutoSwitch } from "../hooks/useCodexAutoSwitch";
 import { readJsonIfOk } from "../fetch-json";
 import { CodexAccountPoolCards, CodexAccountPoolReauthBanner } from "./codex-account-pool-cards";
+import CodexQuotaRecoveryNotice from "./CodexQuotaRecoveryNotice";
 import { CodexAccountSwitchModal } from "./codex-account-switch-modal";
 import { CodexAccountResetModal } from "./codex-account-reset-modal";
 import { CodexAccountPoolLoadStates, CodexAccountPoolMainCard, CodexAccountPoolPageHead } from "./codex-account-pool-main-card";
@@ -54,13 +55,14 @@ export default function CodexAccountPool({ apiBase, accountModeState = null, ban
   // but stays inert (no load, no polling) whenever a shared controller was injected.
   const ownController = useCodexAccountPool(apiBase, !injectedController);
   const controller = injectedController ?? ownController;
-  const { accounts, activeId, loadState, switchingId, load } = controller;
+  const { accounts, activeId, loadState, switchingId, load, recoveryCandidates } = controller;
   const [confirm, setConfirm] = useState<CodexAccountEntry | null>(null);
   const [showAdd, setShowAdd] = useState(false);
   const [reauthId, setReauthId] = useState<string | null>(null);
   const [toast, setToast] = useState("");
   const [toastError, setToastError] = useState(false);
   const [refreshingQuota, setRefreshingQuota] = useState(false);
+  const [recoverySwitchError, setRecoverySwitchError] = useState("");
   const [resetPopup, setResetPopup] = useState<CodexAccountEntry | null>(null);
   const [resetConfirm, setResetConfirm] = useState(false);
   const [redeeming, setRedeeming] = useState(false);
@@ -177,6 +179,41 @@ export default function CodexAccountPool({ apiBase, accountModeState = null, ban
     }
   };
 
+  const selectRecoveryAccount = async (account: typeof recoveryCandidates[number]): Promise<boolean> => {
+    setRecoverySwitchError("");
+    if (account.quotaHealth.stale) {
+      setRefreshingQuota(true);
+      try {
+        const refreshed = await load(true);
+        if (!refreshed) {
+          setRecoverySwitchError(t("codexAuth.quotaStale"));
+          return false;
+        }
+      } finally {
+        setRefreshingQuota(false);
+      }
+    }
+    const result = await controller.switchAccount(account.id);
+    if (!result.ok) {
+      if (result.reason !== "busy") {
+        const message = t("codexAuth.recoverySwitchFailed");
+        setRecoverySwitchError(message);
+        setToast(message);
+        setToastError(true);
+        setTimeout(() => setToast(""), 5000);
+      }
+      return false;
+    }
+    const label = accounts.find(candidate => candidate.id === result.activeId)?.email
+      ?? t("pws.accountOrdinal", { count: "1" });
+    setToast(accountModeState === "direct"
+      ? t("codexAuth.poolPreparedToast", { email: label })
+      : t("codexAuth.switched", { email: label }));
+    setToastError(false);
+    setTimeout(() => setToast(""), 5000);
+    return true;
+  };
+
   const openResetPopup = async (account: CodexAccountEntry) => {
     setResetPopup(account);
     setResetConfirm(false);
@@ -216,6 +253,7 @@ export default function CodexAccountPool({ apiBase, accountModeState = null, ban
   const main = accounts.find(a => a.isMain);
   const pool = accounts.filter(a => !a.isMain);
   const isMainActive = !activeId || activeId === "__main__";
+  const activeRecoveryAccount = isMainActive ? main : accounts.find(account => account.id === activeId);
   const switchActionLabel = t(accountModeState === "direct" ? "codexAuth.prepareForPool" : "codexAuth.setAsNext");
 
   return (
@@ -237,6 +275,17 @@ export default function CodexAccountPool({ apiBase, accountModeState = null, ban
       />
 
       {banner}
+
+      <CodexQuotaRecoveryNotice
+        active={activeRecoveryAccount}
+        candidates={recoveryCandidates}
+        refreshing={refreshingQuota}
+        onRefresh={() => { void refreshQuotas(); }}
+        onSelect={selectRecoveryAccount}
+        onLogin={() => setShowAdd(true)}
+        autoSwitchEnabled={(autoSwitch.threshold ?? 0) > 0}
+        switchError={recoverySwitchError}
+      />
 
       <CodexAccountPoolMainCard
         t={t}

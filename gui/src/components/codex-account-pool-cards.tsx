@@ -53,6 +53,15 @@ export function CodexAccountPoolCards({
         const inCooldown = oauthHealthIsCooldown(healthStatus);
         const healthLabel = formatOAuthHealthLabel(t, a.health);
         const healthSummary = formatOAuthHealthSummary(t, "codex", a.id, a.health);
+        const quotaHealthLabel = a.quotaHealth?.status === "exhausted"
+          ? t("codexAuth.quotaExhausted")
+          : a.quotaHealth?.status === "critical"
+            ? (a.quotaHealth.percent ?? 0) >= 95 ? t("codexAuth.quotaUrgent") : t("codexAuth.quotaCritical")
+            : a.quotaHealth?.status === "warning"
+              ? t("codexAuth.quotaWarning")
+              : a.quotaHealth?.status === "unknown" && a.quotaHealth.stale
+                ? t("codexAuth.quotaStale")
+                : null;
         return (
         <div key={a.id} className={`card ${isNext(a.id) ? "card-active" : ""}`} style={{ marginBottom: 8 }}>
           <div className="card-head">
@@ -63,6 +72,9 @@ export function CodexAccountPoolCards({
               <CodexTicketBadge t={t} account={a} onClick={() => onOpenReset(a)} />
               {healthLabel && (
                 <span className={oauthHealthBadgeClass(healthStatus)}>{healthLabel}</span>
+              )}
+              {quotaHealthLabel && (
+                <span className="badge badge-amber">{quotaHealthLabel}</span>
               )}
               {showReauth && !healthLabel && <span className="badge badge-amber">{t("codexAuth.needsReauth")}</span>}
               {isNext(a.id) && !showReauth && !inCooldown && (
