@@ -94,6 +94,33 @@ The **Codex Auth** page manages the native ChatGPT/Codex route:
   values.
 - Pool request logs use opaque labels such as `p3fa91c`, never account emails.
 
+### Quota recovery
+
+Codex Auth warns before an account runs out instead of letting work stop mid-session. Each account
+carries one quota-health state derived from its most restrictive known window (5h, weekly, 30d, or a
+provider-reported custom window):
+
+| Usage of the controlling window | State | What the dashboard does |
+| --- | --- | --- |
+| below 70% | healthy | nothing |
+| 70–79% | warning | shows a status notice with the window, usage, and reset time |
+| 80–94% | critical | recommends switching to another account |
+| 95–99% | critical (urgent) | raises the notice to an alert |
+| 100%, or a hard quota response | exhausted | opens the recovery picker |
+
+Quota data that is missing or too old is reported as unknown, and the notice asks for a refresh
+rather than guessing the remaining quota.
+
+The recovery picker lists the Codex accounts you have already signed in to, with masked email, plan,
+usage, reset time, and a short explanation. Accounts that need reauthentication, have no stored
+credential, or are themselves exhausted cannot be selected. Selecting an account refreshes stale
+quota first, then routes new work to it; existing threads keep their original account, so the picker
+describes this as continuing in a new session. If no account is usable, the notice shows the reset
+time and offers to sign in to another account through the normal Codex login flow.
+
+This is a recovery aid for accounts you already own. It does not raise provider limits, and it never
+creates or automates accounts.
+
 ## How the dashboard talks to the proxy
 
 The GUI is a thin client over the proxy's JSON management API. Useful endpoints include:

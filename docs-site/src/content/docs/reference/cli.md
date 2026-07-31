@@ -333,6 +333,13 @@ For the Codex pool, use `ocx account refresh openai [--json]`. It force-refreshe
 prints available weekly/monthly percentages and reset times; missing quota data is reported as
 unknown, not 0%. Its JSON envelope is `{ accounts: AccountRow[] }`, with `quota` on each Codex row.
 
+Codex rows also carry the quota-recovery state the dashboard uses. Human output appends
+`status=<healthy|warning|critical|exhausted|unknown>` and
+`action=<none|refresh|switch_account|wait_for_reset>`, and `--json` rows include the same values
+under `quotaHealth` plus a `recoveryEligible` flag. The CLI only reports this state; switching
+accounts still happens through `ocx account use` or the dashboard, and existing threads keep their
+account.
+
 For OAuth and API-key providers, this force-refreshes the provider quota-report endpoint; it is not a
 token re-login or a plain account-list re-read. `--json` returns
 `{ provider, report: ProviderQuotaReport | null }`. A provider with no supported quota report prints
