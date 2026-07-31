@@ -184,6 +184,17 @@ const helpEntries: Record<string, HelpEntry> = {
       "Claude Code settings: ocx claude config <status|set> ...",
     ],
   },
+  codex: {
+    usage: "ocx codex [--account <id|email|main>] [codex args...]",
+    summary: "Launch Codex CLI wired to the proxy; optional research-fleet account pin.",
+    details: [
+      "Ensures the proxy is running, then execs `codex` with the remaining args.",
+      "--account pins this process to one Codex Auth pool account (fail-closed; no auto-switch).",
+      "Pin is sent as header x-ocx-codex-account via OCX_CODEX_ACCOUNT + env_http_headers.",
+      "Without --account, pool routing matches normal quota-pool behavior.",
+      "Values: main | pool account id | pool account email (from 'ocx account list openai').",
+    ],
+  },
   restart: {
     usage: "ocx restart",
     summary: "Stop the proxy and restart it (background). Equivalent to stop + ensure.",
@@ -256,6 +267,7 @@ Usage:
   ocx config <sub>            Validated configuration show/get/set/import/export
   ocx claude [args...]        Launch Claude Code wired to the proxy (model discovery on)
   ocx claude desktop [sub]    Manage and apply Claude Desktop's four-family profile
+  ocx codex [--account …]     Launch Codex CLI; optional research pin (fail-closed)
   ocx help [command]          Show help
   ocx --version | -v          Print version
 
@@ -263,6 +275,7 @@ Examples:
   ocx init                    Set up provider and inject into Codex
   ocx start                   Start on default port (10100)
   ocx start --port 8080       Start on custom port
+  ocx codex --account main    Pin this Codex process to the main ChatGPT login
   ocx help service            Show service command help
   ocx sync                    Sync available models to Codex`);
 }

@@ -101,6 +101,10 @@ the product focus differs.
 opencodex implements the **quota pool**. Existing threads stay on one account; new sessions can
 rebalance by usage, cooldown, and health. It is not a parallel multi-account orchestrator.
 
+**Research pin (v1):** for a small owned fleet (2–5 ChatGPT logins) where each worker must stay on
+one account, send `x-ocx-codex-account: <id|main>` or launch with `ocx codex --account …`. The pin
+skips auto-switch and fails closed on 429/reauth; unpinned traffic keeps quota-pool behavior.
+
 ## Also nearby
 
 [1rgs/claude-code-proxy](https://github.com/1rgs/claude-code-proxy) (~3.7k stars) focuses on running

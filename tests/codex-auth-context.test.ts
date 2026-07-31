@@ -6,10 +6,12 @@ import {
   applyCodexAuthContextToProvider,
   assertCodexAuthContextNotCooled,
   CodexAccountCooldownError,
+  CodexAccountPinError,
   CodexAuthContextError,
   CodexDirectAuthenticationError,
   CodexPoolAuthenticationError,
   CodexThreadAffinityExpiredError,
+  CODEX_ACCOUNT_PIN_HEADER,
   cooldownErrorMessage,
   cooldownErrorResponse,
   headersForCodexAuthContext,
@@ -165,6 +167,89 @@ describe("Codex auth context", () => {
       "pool",
       { excludeAccountId: "pool-a" },
     )).rejects.toBeInstanceOf(CodexPoolAuthenticationError);
+  });
+
+  test("pin header selects that pool account and ignores exclusion/auto-switch", async () => {
+    const cfg = config();
+    cfg.codexAccounts?.push({
+      id: "pool-b",
+      email: "pool-b@example.test",
+      isMain: false,
+      chatgptAccountId: "pool_b_acc",
+    });
+    saveCodexAccountCredential("pool-a", {
+      accessToken: "pool_a_token",
+      refreshToken: "pool_a_refresh",
+      expiresAt: Date.now() + 5 * 60_000,
+      chatgptAccountId: "pool_a_acc",
+    });
+    saveCodexAccountCredential("pool-b", {
+      accessToken: "pool_b_token",
+      refreshToken: "pool_b_refresh",
+      expiresAt: Date.now() + 5 * 60_000,
+      chatgptAccountId: "pool_b_acc",
+    });
+
+    await expect(resolveCodexAuthContext(
+      new Headers({ [CODEX_ACCOUNT_PIN_HEADER]: "pool-b" }),
+      cfg,
+      "pool",
+      { excludeAccountId: "pool-b" },
+    )).resolves.toMatchObject({
+      kind: "pool",
+      accountId: "pool-b",
+      accessToken: "pool_b_token",
+    });
+  });
+
+  test("unknown pin fails closed without selecting another account", async () => {
+    saveCodexAccountCredential("pool-a", {
+      accessToken: "pool_a_token",
+      refreshToken: "pool_a_refresh",
+      expiresAt: Date.now() + 5 * 60_000,
+      chatgptAccountId: "pool_a_acc",
+    });
+    await expect(resolveCodexAuthContext(
+      new Headers({ [CODEX_ACCOUNT_PIN_HEADER]: "missing-pool" }),
+      config(),
+      "pool",
+    )).rejects.toBeInstanceOf(CodexAccountPinError);
+  });
+
+  test("pinned cooldown fails closed instead of switching to another pool account", async () => {
+    const cfg = config();
+    cfg.codexAccounts?.push({
+      id: "pool-b",
+      email: "pool-b@example.test",
+      isMain: false,
+      chatgptAccountId: "pool_b_acc",
+    });
+    saveCodexAccountCredential("pool-a", {
+      accessToken: "pool_a_token",
+      refreshToken: "pool_a_refresh",
+      expiresAt: Date.now() + 5 * 60_000,
+      chatgptAccountId: "pool_a_acc",
+    });
+    saveCodexAccountCredential("pool-b", {
+      accessToken: "pool_b_token",
+      refreshToken: "pool_b_refresh",
+      expiresAt: Date.now() + 5 * 60_000,
+      chatgptAccountId: "pool_b_acc",
+    });
+    const now = 1_800_000_000_000;
+    // retry-after cooldowns never admit probes — pin must error, not fall over to pool-b.
+    recordCodexUpstreamOutcome(cfg, "pool-a", 429, { retryAfter: "60", now });
+
+    await expect(resolveCodexAuthContext(
+      new Headers({ [CODEX_ACCOUNT_PIN_HEADER]: "pool-a" }),
+      cfg,
+      "pool",
+    )).rejects.toBeInstanceOf(CodexAccountCooldownError);
+
+    await expect(resolveCodexAuthContext(new Headers(), cfg, "pool")).resolves.toMatchObject({
+      kind: "pool",
+      accountId: "pool-b",
+    });
   });
 
   test("selected pool headers replace inbound main auth", () => {

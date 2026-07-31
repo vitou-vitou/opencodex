@@ -964,6 +964,7 @@ export const en = {
   "codexAuth.accountModePool": "Pool mode",
   "codexAuth.accountModePoolDesc": "One request path: the main login and eligible added accounts rotate here by quota, cooldown, and failover. Existing threads keep affinity.",
   "codexAuth.poolNotParallelNote": "This is a quota pool, not a parallel fleet. It does not run N Codex sessions at once (one account per concurrent agent).",
+  "codexAuth.researchPinHint": "Research pin (parallel workers): send header x-ocx-codex-account or run ocx codex --account <id|email|main>. Pinned requests fail closed on 429/reauth — they do not auto-switch.",
   "codexAuth.accountModeDirect": "Direct mode",
   "codexAuth.accountModeDirectDesc": "Requests use only the main login; added accounts remain stored for Pool mode.",
   "codexAuth.openaiMissing": "The built-in OpenAI provider is not configured.",

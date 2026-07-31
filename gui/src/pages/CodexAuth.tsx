@@ -27,6 +27,7 @@ export function OpenAiAccountModeBanner({
         <>
           <p className="card-sub" style={{ margin: "6px 0 0" }}>{t("codexAuth.accountModePoolDesc")}</p>
           <p className="card-sub faint" style={{ margin: "6px 0 0" }}>{t("codexAuth.poolNotParallelNote")}</p>
+          <p className="card-sub faint" style={{ margin: "6px 0 0" }}>{t("codexAuth.researchPinHint")}</p>
         </>
       )}
       {state === "direct" && (

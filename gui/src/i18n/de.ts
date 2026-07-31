@@ -622,6 +622,7 @@ export const de: Record<TKey, string> = {
   "codexAuth.accountModePool": "Pool-Modus",
   "codexAuth.accountModePoolDesc": "Ein Anfragepfad: die Hauptanmeldung und geeignete hinzugefügte Konten wechseln hier nach Kontingent, Abklingzeit und Failover. Bestehende Threads behalten Affinität.",
   "codexAuth.poolNotParallelNote": "Das ist ein Kontingent-Pool, keine parallele Flotte. Es werden nicht N Codex-Sitzungen gleichzeitig ausgeführt (ein Konto pro parallelem Agent).",
+  "codexAuth.researchPinHint": "Research-Pin (parallele Worker): Header x-ocx-codex-account senden oder ocx codex --account <id|email|main> ausführen. Gepinnte Anfragen scheitern bei 429/Reauth geschlossen — kein Auto-Switch.",
   "codexAuth.accountModeDirect": "Direktmodus",
   "codexAuth.accountModeDirectDesc": "Anfragen verwenden nur die Hauptanmeldung; hinzugefügte Konten bleiben für den Pool-Modus gespeichert.",
   "codexAuth.openaiMissing": "Der integrierte OpenAI-Anbieter ist nicht konfiguriert.",

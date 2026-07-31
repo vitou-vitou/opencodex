@@ -24,6 +24,7 @@ import { appendFileSync } from "node:fs";
 import { formatErrorResponse } from "../bridge";
 import {
   CodexAccountCooldownError,
+  CodexAccountPinError,
   cooldownErrorResponse,
   CodexAuthContextError,
   CodexPoolAuthenticationError,
@@ -409,6 +410,8 @@ export async function resolveLiveRelay(
           "Selected Codex account needs reauthentication",
         );
       } else if (err instanceof CodexPoolAuthenticationError) {
+        forwardAuthError = formatErrorResponse(401, "authentication_error", err.message);
+      } else if (err instanceof CodexAccountPinError) {
         forwardAuthError = formatErrorResponse(401, "authentication_error", err.message);
       } else {
         throw err;

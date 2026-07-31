@@ -34,7 +34,8 @@ Codex 使用 OpenAI **Responses API**。opencodex 接收通过 HTTP 与 Server-S
 
 :::note[不是并行舰队]
 该池是**单条请求路径上的配额池**：已有线程保持亲和性；新会话可按用量故障转移或自动切换。它**不会**为每个
-账号并行跑 N 个 Codex 会话。并行舰队需要此路由之外的独立智能体与账号。同类区分见
+账号并行跑 N 个 Codex 会话。研究钉选（每个 worker 固定账号）可用请求头 `x-ocx-codex-account` 或
+`ocx codex --account <id|email|main>`：钉选流量在 429/重新认证时失败关闭，不会自动切换。同类区分见
 [代理对比](/zh-cn/guides/compare-proxies/)。
 :::
 

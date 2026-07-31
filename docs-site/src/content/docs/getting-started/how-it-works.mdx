@@ -42,8 +42,10 @@ account before the request is forwarded upstream. The rule is intentionally spli
 :::note[Not a parallel fleet]
 This pool is a **quota pool on one request path**: existing threads keep affinity; new sessions can
 fail over or auto-switch by usage. It does **not** run N parallel Codex sessions (one account per
-concurrent agent). Parallel fleets need separate agents and accounts outside this routing. For the
-same distinction versus peer tools, see [Compare Proxies](/guides/compare-proxies/).
+concurrent agent). For a research harness that needs sticky per-worker identity, pin with header
+`x-ocx-codex-account` or `ocx codex --account <id|email|main>` — pinned traffic fails closed on
+429/reauth and never auto-switches. For the same distinction versus peer tools, see
+[Compare Proxies](/guides/compare-proxies/).
 :::
 
 ## Sub-agent model selection

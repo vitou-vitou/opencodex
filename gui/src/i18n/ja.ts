@@ -921,6 +921,7 @@ export const ja: Record<TKey, string> = {
   "codexAuth.accountModePool": "プールモード",
   "codexAuth.accountModePoolDesc": "リクエスト経路は 1 本: メインログインと対象の追加アカウントがクォータ・クールダウン・フェイルオーバーでここで切り替わります。既存スレッドはアフィニティを保ちます。",
   "codexAuth.poolNotParallelNote": "これはクォータプールであり、並列フリートではありません。同時に N 本の Codex セッション（並列エージェントごとにアカウント）は起動しません。",
+  "codexAuth.researchPinHint": "リサーチピン（並列ワーカー）: ヘッダー x-ocx-codex-account を送るか ocx codex --account <id|email|main> を実行。ピン中は 429/再認証でフェイルクローズし、自動切替しません。",
   "codexAuth.accountModeDirect": "ダイレクトモード",
   "codexAuth.accountModeDirectDesc": "リクエストはメインログインのみを使用します; 追加アカウントはプールモード用に保持されます。",
   "codexAuth.openaiMissing": "組み込みの OpenAI プロバイダーが設定されていません。",

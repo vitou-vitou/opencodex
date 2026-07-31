@@ -86,6 +86,10 @@ opencodex にも [サイドカー](/ja/guides/sidecars/) がありますが製�
 opencodex が実装するのは **クォータプール**です。既存スレッドは 1 アカウントに留まり、新規セッションは
 使用量・クールダウン・健全性で再配分できます。並列マルチアカウントのオーケストレータではありません。
 
+**リサーチピン（v1）:** 少数の自前ログイン（2–5）でワーカーごとに固定したい場合は
+`x-ocx-codex-account: <id|main>` または `ocx codex --account …`。ピンは自動切替をスキップし、
+429/再認証ではフェイルクローズ。未ピンは通常のクォータプールのままです。
+
 ## 近くのツール
 
 [1rgs/claude-code-proxy](https://github.com/1rgs/claude-code-proxy)（~3.7k）は Claude Code を

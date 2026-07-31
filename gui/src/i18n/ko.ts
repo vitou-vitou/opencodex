@@ -639,6 +639,7 @@ export const ko: Record<TKey, string> = {
   "codexAuth.accountModePool": "풀 모드",
   "codexAuth.accountModePoolDesc": "요청 경로는 하나: 메인 로그인과 사용 가능한 추가 계정이 할당량·대기·장애 조치로 여기서 전환됩니다. 기존 thread는 친화성을 유지합니다.",
   "codexAuth.poolNotParallelNote": "할당량 풀이지 병렬 플릿이 아닙니다. 동시에 N개의 Codex 세션(병렬 에이전트당 계정 하나)을 돌리지 않습니다.",
+  "codexAuth.researchPinHint": "리서치 핀(병렬 워커): 헤더 x-ocx-codex-account를 보내거나 ocx codex --account <id|email|main>을 실행하세요. 핀된 요청은 429/재인증 시 페일 클로즈되며 자동 전환하지 않습니다.",
   "codexAuth.accountModeDirect": "직접 모드",
   "codexAuth.accountModeDirectDesc": "요청은 메인 로그인만 사용하며, 추가 계정은 풀 모드용으로 계속 저장됩니다.",
   "codexAuth.openaiMissing": "내장 OpenAI 프로바이더가 설정되지 않았습니다.",

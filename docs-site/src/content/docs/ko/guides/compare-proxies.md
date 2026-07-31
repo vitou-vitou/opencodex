@@ -85,6 +85,10 @@ vLLM/Bedrock/혼합 백엔드 앞 프로토콜 변환이 주 목적인 경우.
 opencodex는 **할당량 풀**을 구현합니다. 기존 thread는 한 계정에 머물고, 새 세션은 사용량·cooldown·상태에 따라
 재분배될 수 있습니다. 병렬 멀티 계정 오케스트레이터가 아닙니다.
 
+**리서치 핀(v1):** 소규모 소유 로그인(2–5)에서 워커마다 계정을 고정하려면
+`x-ocx-codex-account: <id|main>` 또는 `ocx codex --account …`를 사용하세요. 핀은 자동 전환을 건너뛰고
+429/재인증 시 페일 클로즈합니다. 핀 없는 트래픽은 할당량 풀 동작을 유지합니다.
+
 ## 근처 도구
 
 [1rgs/claude-code-proxy](https://github.com/1rgs/claude-code-proxy)(~3.7k)는 Claude Code를 OpenAI형

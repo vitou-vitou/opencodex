@@ -639,6 +639,7 @@ export const zh: Record<TKey, string> = {
   "codexAuth.accountModePool": "账户池模式",
   "codexAuth.accountModePoolDesc": "单条请求路径：主登录与符合条件的已添加账户按配额、冷却与故障转移在此轮换。已有线程保持亲和性。",
   "codexAuth.poolNotParallelNote": "这是配额池，不是并行舰队。不会同时运行 N 个 Codex 会话（每个并发智能体一个账号）。",
+  "codexAuth.researchPinHint": "研究钉选（并行 worker）：发送请求头 x-ocx-codex-account，或运行 ocx codex --account <id|email|main>。钉选请求在 429/重新认证时失败关闭，不会自动切换账号。",
   "codexAuth.accountModeDirect": "直连模式",
   "codexAuth.accountModeDirectDesc": "请求仅使用主登录；已添加账户会继续存储，供账户池模式使用。",
   "codexAuth.openaiMissing": "未配置内置 OpenAI 提供方。",

@@ -42,6 +42,7 @@ import { createAdapterEventQueue, preflightAdapterEvents } from "../../adapters/
 import {
   applyCodexAuthContextToProvider,
   CodexAccountCooldownError,
+  CodexAccountPinError,
   cooldownErrorResponse,
   CodexAuthContextError,
   CodexDirectAuthenticationError,
@@ -241,6 +242,9 @@ export async function handleResponsesCompact(
         return formatErrorResponse(401, "authentication_error", "Selected Codex account needs reauthentication");
       }
       if (err instanceof CodexPoolAuthenticationError || err instanceof CodexDirectAuthenticationError) {
+        return formatErrorResponse(401, "authentication_error", err.message);
+      }
+      if (err instanceof CodexAccountPinError) {
         return formatErrorResponse(401, "authentication_error", err.message);
       }
       throw err;

@@ -80,6 +80,9 @@ vLLM 等标准化为 OpenAI 形态 API。
 
 opencodex 实现的是**配额池**。已有线程留在同一账号；新会话可按用量、冷却与健康再平衡。它不是并行多账号编排器。
 
+**研究钉选（v1）：** 小规模自有舰队（2–5 个 ChatGPT 登录）且每个 worker 需固定账号时，发送
+`x-ocx-codex-account: <id|main>` 或使用 `ocx codex --account …`。钉选跳过自动切换，在 429/重新认证时失败关闭；未钉选流量仍走配额池。
+
 ## 相近工具
 
 [1rgs/claude-code-proxy](https://github.com/1rgs/claude-code-proxy)（~3.7k）侧重让 Claude Code

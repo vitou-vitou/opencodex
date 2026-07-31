@@ -963,6 +963,7 @@ export const ru: Record<TKey, string> = {
   "codexAuth.accountModePool": "Режим пула",
   "codexAuth.accountModePoolDesc": "Один путь запроса: основной вход и подходящие добавленные аккаунты ротируются здесь по квоте, кулдауну и failover. Существующие треды сохраняют affinity.",
   "codexAuth.poolNotParallelNote": "Это пул квот, а не параллельный флот. Он не запускает N сессий Codex одновременно (по аккаунту на параллельного агента).",
+  "codexAuth.researchPinHint": "Research pin (параллельные воркеры): заголовок x-ocx-codex-account или ocx codex --account <id|email|main>. Закреплённые запросы при 429/reauth завершаются ошибкой — без автопереключения.",
   "codexAuth.accountModeDirect": "Прямой режим",
   "codexAuth.accountModeDirectDesc": "Запросы используют только основной вход; добавленные аккаунты сохраняются для режима пула.",
   "codexAuth.openaiMissing": "Встроенный провайдер OpenAI не настроен.",
