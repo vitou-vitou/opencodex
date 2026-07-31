@@ -87,7 +87,7 @@ export function projectCodexQuotaHealth(input: {
     : 80;
   const action = status === "exhausted"
     ? "wait_for_reset"
-    : percent >= threshold
+    : threshold > 0 && percent >= threshold
       ? "switch_account"
       : "none";
 

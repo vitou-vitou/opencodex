@@ -23,3 +23,18 @@ Status: DONE_WITH_CONCERNS
 - `bun run test` was started twice with 120-second and 300-second limits; neither produced output or completed before timeout. The full-suite result is therefore unverified. The focused Task 1 suite and typecheck are green.
 
 Only the Task 1 source and test files were included in the feature commit. GUI, API, docs, and unrelated files were not changed.
+
+## Review Fix
+
+Status: DONE
+
+Finding fixed: non-positive `threshold` values now disable switch-account recommendations while preserving quota health status. Exhausted quota continues to recommend `wait_for_reset`.
+
+Added a regression test covering a 95% critical quota with `threshold: 0` and `action: "none"`.
+
+## Fix Verification
+
+- `bun test tests/codex-quota-recovery.test.ts` — PASS.
+- `bun x tsc --noEmit` — PASS.
+
+Concerns: none for this finding. The pre-existing full-suite timeout concern remains unchanged.

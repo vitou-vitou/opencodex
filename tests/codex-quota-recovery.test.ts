@@ -83,6 +83,15 @@ describe("projectCodexQuotaHealth", () => {
     })).toMatchObject({ status: "healthy", percent: 50, action: "switch_account" });
   });
 
+  test("disables switch recommendations when the threshold is zero", () => {
+    expect(projectCodexQuotaHealth({
+      windows: [{ label: "weekly", percent: 95 }],
+      threshold: 0,
+      updatedAt: NOW,
+      now: NOW,
+    })).toMatchObject({ status: "critical", percent: 95, action: "none" });
+  });
+
   test("marks old quota as stale and asks for a refresh", () => {
     expect(projectCodexQuotaHealth({
       windows: [{ label: "weekly", percent: 80, resetAt: RESET_EARLY }],
