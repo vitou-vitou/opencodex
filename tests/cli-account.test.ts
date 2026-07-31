@@ -340,8 +340,9 @@ beforeEach(() => {
         weeklyResetAt: 1_800_000_000,
         monthlyResetAt: 1_900_000_000,
       },
+      quotaHealth: { status: "healthy", stale: false, action: "none", windowLabel: "weekly", percent: 42 },
     },
-    { id: "chatgpt_1", email: "j***@example.com", plan: "pro", needsReauth: true, quota: null },
+    { id: "chatgpt_1", email: "j***@example.com", plan: "pro", needsReauth: true, quota: null, quotaHealth: { status: "unknown", stale: true, action: "refresh" } },
   ];
   oauthAccounts = [
     { id: "acct_1", email: "a***@example.com" },
@@ -619,6 +620,7 @@ describe("ocx account CLI (issue #180 matrix)", () => {
     expect(human.stdout).toContain("monthly 17%");
     expect(human.stdout).toContain("resets 2027-");
     expect(human.stdout).toContain("chatgpt_1 j***@example.com pro quota: unknown needs-reauth");
+    expect(human.stdout).toContain("status=unknown action=refresh");
     expect(parsed.accounts.find(row => row.id === "__main__")?.quota).toEqual({
       weeklyPercent: 42,
       monthlyPercent: 17,
@@ -626,6 +628,15 @@ describe("ocx account CLI (issue #180 matrix)", () => {
       monthlyResetAt: 1_900_000_000,
     });
     expect(parsed.accounts.find(row => row.id === "chatgpt_1")?.quota).toBeNull();
+    expect(parsed.accounts.find(row => row.id === "__main__")?.quotaHealth).toMatchObject({
+      status: "healthy",
+      action: "none",
+      windowLabel: "weekly",
+    });
+    expect(parsed.accounts.find(row => row.id === "chatgpt_1")?.quotaHealth).toMatchObject({
+      status: "unknown",
+      action: "refresh",
+    });
   });
 
   test("19: refresh OAuth and key providers use the provider quota endpoint", async () => {

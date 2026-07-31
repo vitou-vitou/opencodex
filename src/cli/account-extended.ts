@@ -84,6 +84,10 @@ function refreshLine(row: FamilyRows["rows"][number]): string {
     if (monthlyReset) parts.push(`resets ${monthlyReset}`);
   }
   if (row.needsReauth) parts.push("needs-reauth");
+  if (row.quotaHealth) {
+    parts.push(`status=${row.quotaHealth.status}`);
+    parts.push(`action=${row.quotaHealth.action}`);
+  }
   return parts.filter(Boolean).join(" ");
 }
 

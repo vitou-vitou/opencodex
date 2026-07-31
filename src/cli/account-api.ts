@@ -22,6 +22,8 @@ export interface AccountRow {
   active: boolean;
   needsReauth?: boolean;
   quota?: CodexQuotaDto | null;
+  quotaHealth?: CodexQuotaHealthDto;
+  recoveryEligible?: boolean;
 }
 
 export type ClassifyResult = { type: AccountType } | { error: string };
@@ -132,6 +134,15 @@ export interface ProviderQuotaDto extends CodexQuotaDto {
   updatedAt?: number;
 }
 
+export interface CodexQuotaHealthDto {
+  status: "healthy" | "warning" | "critical" | "exhausted" | "unknown";
+  percent?: number;
+  windowLabel?: string;
+  resetAt?: number;
+  stale: boolean;
+  action: "none" | "refresh" | "switch_account" | "wait_for_reset";
+}
+
 export interface ProviderQuotaReportDto {
   provider: string;
   label?: string;
@@ -149,6 +160,8 @@ interface CodexAccountDto {
   isMain?: boolean;
   needsReauth?: boolean;
   quota?: CodexQuotaDto | null;
+  quotaHealth?: CodexQuotaHealthDto;
+  recoveryEligible?: boolean;
 }
 
 function projectQuota(quota: CodexQuotaDto | null | undefined): CodexQuotaDto | null {
@@ -195,6 +208,8 @@ export async function fetchCodexRows(
     plan: a.plan,
     active: a.id === activeId,
     needsReauth: a.needsReauth,
+    ...(a.quotaHealth ? { quotaHealth: a.quotaHealth } : {}),
+    ...(typeof a.recoveryEligible === "boolean" ? { recoveryEligible: a.recoveryEligible } : {}),
     ...(forceRefresh ? { quota: projectQuota(a.quota) } : {}),
   }));
   return { rows, activeId, autoSwitchThreshold, status: 200 };
