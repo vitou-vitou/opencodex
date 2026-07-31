@@ -504,6 +504,8 @@ describe("ocx account CLI (issue #180 matrix)", () => {
     expect(bare.code).toBe(1);
     expect(bare.stderr).toContain("Usage:");
     expect(bare.stderr).toContain("ocx account list");
+    expect(bare.stderr).toContain("quota pool with thread affinity");
+    expect(bare.stderr).toContain("not N parallel Codex sessions");
     expect(missingId.code).toBe(1);
     expect(missingId.stderr).toContain("Usage:");
     expect(missingId.stderr).toContain("ocx account use");

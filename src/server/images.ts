@@ -15,6 +15,7 @@
 import { formatErrorResponse } from "../bridge";
 import {
   CodexAccountCooldownError,
+  CodexAccountPinError,
   cooldownErrorResponse,
   CodexAuthContextError,
   CodexPoolAuthenticationError,
@@ -100,6 +101,8 @@ export async function handleImages(
         console.error(`[images] Pool account ${safeAccountLabel} token failed; reauthentication required`);
         forwardAuthError = formatErrorResponse(401, "authentication_error", "Selected Codex account needs reauthentication");
       } else if (err instanceof CodexPoolAuthenticationError) {
+        forwardAuthError = formatErrorResponse(401, "authentication_error", err.message);
+      } else if (err instanceof CodexAccountPinError) {
         forwardAuthError = formatErrorResponse(401, "authentication_error", err.message);
       } else {
         throw err;

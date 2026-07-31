@@ -11,6 +11,7 @@
 import { formatErrorResponse } from "../bridge";
 import {
   CodexAccountCooldownError,
+  CodexAccountPinError,
   cooldownErrorResponse,
   CodexAuthContextError,
   CodexPoolAuthenticationError,
@@ -89,6 +90,7 @@ export async function handleSearch(
       return formatErrorResponse(401, "authentication_error", "Selected Codex account needs reauthentication");
     }
     if (err instanceof CodexPoolAuthenticationError) return formatErrorResponse(401, "authentication_error", err.message);
+    if (err instanceof CodexAccountPinError) return formatErrorResponse(401, "authentication_error", err.message);
     throw err;
   }
 

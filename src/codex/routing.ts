@@ -439,6 +439,17 @@ function bindThreadAffinity(threadId: string, accountId: string, now: number): v
   pruneLruThreadAffinities();
 }
 
+/** Bind (or rebind) thread affinity to a specific account — used by research account pins. */
+export function bindCodexThreadAffinity(threadId: string, accountId: string, now = Date.now()): void {
+  bindThreadAffinity(threadId, accountId, now);
+}
+
+/** True when the id is the main login or a configured non-main pool account row. */
+export function isConfiguredCodexPoolAccountId(config: OcxConfig, accountId: string): boolean {
+  if (accountId === MAIN_CODEX_ACCOUNT_ID) return true;
+  return (config.codexAccounts ?? []).some(account => !account.isMain && account.id === accountId);
+}
+
 function getEligiblePoolAccounts(config: OcxConfig, excludeId?: string, now = Date.now()): string[] {
   const ids = (config.codexAccounts ?? [])
     .filter(account => !account.isMain && account.id !== excludeId && !isAccountNeedsReauth(account.id))

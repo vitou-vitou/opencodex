@@ -1006,6 +1006,10 @@ switch (command) {
     }
     process.exit(await cmdClaude(args.slice(1)));
   }
+  case "codex": {
+    const { cmdCodex } = await import("./codex");
+    process.exit(await cmdCodex(args.slice(1)));
+  }
     case "help":
   case "--help":
   case "-h":

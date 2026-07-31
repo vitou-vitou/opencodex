@@ -31,7 +31,9 @@ const ACCOUNT_USAGE = `Usage:
   ocx account reset-credits <account-id|main> [--consume --yes] [--json]
 
 List and switch provider accounts and API-key pools (masked output only).
-'main' selects the Codex App login for the openai account pool.`;
+'main' selects the Codex App login for the openai account pool.
+The openai Codex pool is a quota pool with thread affinity (existing threads stay on one
+account; new sessions can auto-switch by usage/429) — not N parallel Codex sessions.`;
 
 function consumeFlag(args: string[], flag: string): boolean {
   const idx = args.indexOf(flag);

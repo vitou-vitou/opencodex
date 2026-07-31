@@ -21,6 +21,24 @@ Codex 使用 OpenAI **Responses API**。opencodex 接收通过 HTTP 与 Server-S
             └─────────────────────────────────────────────────────────────────────┘
 ```
 
+## Codex 认证账号选择
+
+当所选提供商为 ChatGPT/Codex 透传时，opencodex 可在转发上游前从已存储的账号池中选择账号。规则刻意拆成两部分：
+
+- **已有 thread id 保持亲和性。** 线程绑定到启动时的账号世代，因此经 SSH、tmux 或移动端挂接的长
+  Codex 会话不会在对话中途被重新分配。
+- **新会话可以再平衡。** 对新 thread，opencodex 比较 5 小时、周与 30 日窗口内已知用量，跳过需重新认证
+  或冷却中的账号，并在当前账号超过配置阈值时可切换到用量更低的可用账号。
+- **配额与失败信号影响路由。** 仪表盘可用 `GET /api/codex-auth/accounts?refresh=1` 强制刷新配额；成功的
+  上游响应会记录配额头，429 使账号进入冷却，401/403 标记为需重新认证。
+
+:::note[不是并行舰队]
+该池是**单条请求路径上的配额池**：已有线程保持亲和性；新会话可按用量故障转移或自动切换。它**不会**为每个
+账号并行跑 N 个 Codex 会话。研究钉选（每个 worker 固定账号）可用请求头 `x-ocx-codex-account` 或
+`ocx codex --account <id|email|main>`：钉选流量在 429/重新认证时失败关闭，不会自动切换。同类区分见
+[代理对比](/zh-cn/guides/compare-proxies/)。
+:::
+
 ## Sub-agent 模型选择
 
 全新安装会通过 `subagentModels` 在 Codex 的 sub-agent 选择器中优先显示 `gpt-5.5`、GPT-5.6

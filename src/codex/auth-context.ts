@@ -4,12 +4,14 @@ import {
   getValidCodexToken,
   isCodexAccountGenerationLive,
 } from "./account-store";
-import { markAccountNeedsReauth } from "./account-runtime-state";
+import { isAccountNeedsReauth, markAccountNeedsReauth } from "./account-runtime-state";
 import { isCodexAccountUsable } from "./account-usability";
 import { reconcileMainCodexAccountRuntimeState } from "./account-lifecycle";
 import { MAIN_CODEX_ACCOUNT_ID, getMainAccountToken } from "./main-account";
 import {
+  bindCodexThreadAffinity,
   getCodexAccountHealthSnapshot,
+  isConfiguredCodexPoolAccountId,
   releaseCodexQuotaProbeLease,
   tryAcquireCodexQuotaProbeLease,
   pickLowestUsageCodexAccount,
@@ -21,6 +23,11 @@ import { formatErrorResponse } from "../bridge";
 import { getAccountQuota } from "./quota";
 import type { CodexAccountMode, OcxConfig, OcxProviderConfig } from "../types";
 import { FORWARD_HEADERS } from "../adapters/openai-responses";
+
+/** Inbound research-fleet pin (Codex sends via env_http_headers). */
+export const CODEX_ACCOUNT_PIN_HEADER = "x-ocx-codex-account";
+/** Env var name Codex maps into {@link CODEX_ACCOUNT_PIN_HEADER}. */
+export const CODEX_ACCOUNT_PIN_ENV = "OCX_CODEX_ACCOUNT";
 
 export type CodexAuthContext =
   | { kind: "main"; accountId: null }
@@ -151,6 +158,24 @@ export class CodexThreadAffinityExpiredError extends Error {
   }
 }
 
+export class CodexAccountPinError extends Error {
+  pin: string;
+
+  constructor(pin: string, detail: string) {
+    super(`Codex account pin rejected (${detail})`);
+    this.name = "CodexAccountPinError";
+    this.pin = pin;
+  }
+}
+
+/** Parse research-fleet pin from inbound headers. `main` maps to the main pool id. */
+export function parseCodexAccountPinHeader(headers: Headers): string | null {
+  const raw = headers.get(CODEX_ACCOUNT_PIN_HEADER)?.trim();
+  if (!raw) return null;
+  if (raw === "main" || raw === MAIN_CODEX_ACCOUNT_ID) return MAIN_CODEX_ACCOUNT_ID;
+  return raw;
+}
+
 export function shouldMarkAccountNeedsReauthForCodexAuthFailure(cause: unknown): boolean {
   return !(cause instanceof CodexCredentialGenerationConflictError) && !(cause instanceof CodexCredentialRefreshLockTimeoutError);
 }
@@ -171,16 +196,34 @@ export async function resolveCodexAuthContext(
   }
   reconcileMainCodexAccountRuntimeState();
   const threadId = headers.get("x-codex-parent-thread-id");
-  const resolution = options.excludeAccountId
-    ? (() => {
-        const accountId = pickLowestUsageCodexAccount(config, options.excludeAccountId);
-        return accountId
-          ? { status: "selected" as const, accountId }
-          : { status: "none" as const };
-      })()
-    : resolveCodexAccountForThreadDetailed(threadId, config);
-  if (resolution.status === "expired") throw new CodexThreadAffinityExpiredError(resolution.accountId);
-  const accountId = resolution.status === "selected" ? resolution.accountId : null;
+  const pin = parseCodexAccountPinHeader(headers);
+  let accountId: string | null = null;
+  if (pin) {
+    const pinLabel = pin === MAIN_CODEX_ACCOUNT_ID ? "main" : pin;
+    if (!isConfiguredCodexPoolAccountId(config, pin)) {
+      throw new CodexAccountPinError(pinLabel, "unknown account");
+    }
+    // Fail closed before token work: never substitute another pool account.
+    if (!isCodexAccountUsable(config, pin)) {
+      throw new CodexAccountPinError(
+        pinLabel,
+        isAccountNeedsReauth(pin) ? "needs reauthentication" : "credential unavailable",
+      );
+    }
+    accountId = pin;
+    if (threadId) bindCodexThreadAffinity(threadId, accountId);
+  } else {
+    const resolution = options.excludeAccountId
+      ? (() => {
+          const picked = pickLowestUsageCodexAccount(config, options.excludeAccountId);
+          return picked
+            ? { status: "selected" as const, accountId: picked }
+            : { status: "none" as const };
+        })()
+      : resolveCodexAccountForThreadDetailed(threadId, config);
+    if (resolution.status === "expired") throw new CodexThreadAffinityExpiredError(resolution.accountId);
+    accountId = resolution.status === "selected" ? resolution.accountId : null;
+  }
   if (!accountId) throw new CodexPoolAuthenticationError();
   // Lazy prime: if the selected account has no quota yet, the pool is likely
   // unprimed (dashboard never opened, or startup prime was blocked). Kick a
@@ -199,6 +242,7 @@ export async function resolveCodexAuthContext(
   // A cooled-down account never sends traffic, so upstream recovery can never be
   // observed and the cooldown outlives the real limit. Admit one probe per
   // interval; its outcome decides whether the cooldown ends (#433).
+  // Research pins stay on the same account (fail-closed); probes never switch identity.
   let probeLeaseId: string | undefined;
   if (cooldownUntil) {
     probeLeaseId = tryAcquireCodexQuotaProbeLease(accountId) ?? undefined;
@@ -211,6 +255,7 @@ export async function resolveCodexAuthContext(
     if (!token) {
       // Nothing will reach upstream, so give the probe back instead of burning it.
       if (probeLeaseId) releaseCodexQuotaProbeLease(accountId, probeLeaseId);
+      if (pin) throw new CodexAccountPinError("main", "main login credential unavailable");
       throw new CodexPoolAuthenticationError();
     }
     return {

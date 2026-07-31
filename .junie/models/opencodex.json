@@ -1,0 +1,6 @@
+{
+  "baseUrl": "http://127.0.0.1:10100/v1/chat/completions",
+  "id": "gpt-5.6-luna",
+  "apiType": "OpenAICompletion",
+  "apiKey": "sk-local"
+}

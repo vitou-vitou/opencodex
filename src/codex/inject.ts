@@ -1,3 +1,4 @@
+import { CODEX_ACCOUNT_PIN_ENV, CODEX_ACCOUNT_PIN_HEADER } from "./auth-context";
 import { existsSync, readFileSync, unlinkSync } from "node:fs";
 import { atomicWriteFile, loadConfig, websocketsEnabled } from "../config";
 import { markJournalInjectedState, removeJournal, restoreJournalState, writeJournal } from "./journal";
@@ -102,6 +103,15 @@ export function shouldInjectApiAuthHeader(config: Pick<OcxConfig, "hostname"> | 
   return !isLoopbackHostname(config?.hostname);
 }
 
+/** Codex `env_http_headers` line: pin always; optional API auth for non-loopback. */
+export function buildCodexEnvHttpHeadersLine(includeApiAuthHeader = false): string {
+  const entries = [
+    ...(includeApiAuthHeader ? ['"x-opencodex-api-key" = "OPENCODEX_API_AUTH_TOKEN"'] : []),
+    `"${CODEX_ACCOUNT_PIN_HEADER}" = "${CODEX_ACCOUNT_PIN_ENV}"`,
+  ];
+  return `env_http_headers = { ${entries.join(", ")} }`;
+}
+
 export function buildProviderTableBlock(port: number, supportsWebsockets = false, includeApiAuthHeader = false, hostname?: string): string {
   const host = providerBaseHost(hostname);
   const lines = [
@@ -112,10 +122,9 @@ export function buildProviderTableBlock(port: number, supportsWebsockets = false
     `base_url = "http://${host}:${port}/v1"`,
     'wire_api = "responses"',
     "requires_openai_auth = true",
+    // Always map the research pin env; Codex omits the header when the env is empty.
+    buildCodexEnvHttpHeadersLine(includeApiAuthHeader),
   ];
-  if (includeApiAuthHeader) {
-    lines.push('env_http_headers = { "x-opencodex-api-key" = "OPENCODEX_API_AUTH_TOKEN" }');
-  }
   if (supportsWebsockets) lines.push("supports_websockets = true");
   return lines.join("\n") + "\n";
 }

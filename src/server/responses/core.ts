@@ -44,6 +44,7 @@ import { createAdapterEventQueue, preflightAdapterEvents } from "../../adapters/
 import {
   applyCodexAuthContextToProvider,
   CodexAccountCooldownError,
+  CodexAccountPinError,
   cooldownErrorResponse,
   CodexAuthContextError,
   CodexDirectAuthenticationError,
@@ -51,6 +52,7 @@ import {
   CodexThreadAffinityExpiredError,
   headersForCodexAuthContext,
   isCodexAuthContextUsable,
+  parseCodexAccountPinHeader,
   resolveCodexAuthContext,
   codexProbeLeaseId,
   releaseCodexAuthContextProbeLease,
@@ -513,6 +515,9 @@ async function resolveResponsesCodexAuth(
         ok: false,
         response: formatErrorResponse(401, "authentication_error", "Selected Codex account needs reauthentication"),
       };
+    }
+    if (err instanceof CodexAccountPinError) {
+      return { ok: false, response: formatErrorResponse(401, "authentication_error", err.message) };
     }
     if (err instanceof CodexPoolAuthenticationError) {
       return { ok: false, response: formatErrorResponse(401, "authentication_error", err.message) };
@@ -1082,6 +1087,7 @@ export async function handleResponses(
       if (
         !(err instanceof CodexPoolAuthenticationError)
         && !(err instanceof CodexAuthContextError)
+        && !(err instanceof CodexAccountPinError)
         && !(err instanceof CodexAccountCooldownError)
         && !(err instanceof CodexThreadAffinityExpiredError)
       ) throw err;
@@ -1218,6 +1224,7 @@ export async function handleResponses(
 
     if (
       usesCodexForwardPoolAuth(authCtx, route.provider)
+      && !parseCodexAccountPinHeader(req.headers)
       && await shouldRetryCodexPoolAccountModel400(
         upstreamResponse,
         route.modelId,
@@ -1237,6 +1244,7 @@ export async function handleResponses(
         if (
           !(error instanceof CodexPoolAuthenticationError)
           && !(error instanceof CodexAuthContextError)
+          && !(error instanceof CodexAccountPinError)
           && !(error instanceof CodexAccountCooldownError)
         ) throw error;
       }
