@@ -55,6 +55,12 @@ import {
   type OAuthAccountHealth,
   type OAuthHealthLabel,
 } from "../oauth/health";
+import {
+  canRecoverWithAccount,
+  projectCodexQuotaHealth,
+  type CodexQuotaHealth,
+  type CodexQuotaWindow,
+} from "./quota-recovery";
 
 function jsonResponse(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), {
@@ -91,14 +97,54 @@ function quotaForPlan<T extends Omit<StoredAccountQuota, "updatedAt"> | StoredAc
   } as T;
 }
 
+type StoredQuotaWithRecoveryWindows = StoredAccountQuota & {
+  fiveHourPercent?: number;
+  fiveHourResetAt?: number;
+  customWindows?: CodexQuotaWindow[];
+};
+
+function quotaWindowsForAccount(quota: StoredAccountQuota | null): CodexQuotaWindow[] {
+  if (!quota) return [];
+  const stored = quota as StoredQuotaWithRecoveryWindows;
+  const windows: CodexQuotaWindow[] = [];
+  const add = (label: string, percent: number | undefined, resetAt: number | undefined): void => {
+    if (percent === undefined) return;
+    windows.push({ label, percent, ...(resetAt === undefined ? {} : { resetAt }) });
+  };
+  add("5h", stored.fiveHourPercent, stored.fiveHourResetAt);
+  add("weekly", stored.weeklyPercent, stored.weeklyResetAt);
+  add("monthly", stored.monthlyPercent, stored.monthlyResetAt);
+  windows.push(...(stored.customWindows ?? []));
+  return windows;
+}
+
+function quotaRecoveryForAccount(
+  quota: StoredAccountQuota | null,
+  threshold: number,
+  hasCredential: boolean,
+  needsReauth: boolean,
+): Pick<CodexAuthAccountDto, "quotaHealth" | "recoveryEligible"> {
+  const quotaHealth = projectCodexQuotaHealth({
+    windows: quotaWindowsForAccount(quota),
+    ...(quota ? { updatedAt: quota.updatedAt } : {}),
+    threshold,
+  });
+  return {
+    quotaHealth,
+    recoveryEligible: canRecoverWithAccount({ hasCredential, needsReauth, quotaHealth }),
+  };
+}
+
 function poolAccountDto(
   account: CodexAccount,
   quotaResult: PoolQuotaResult,
   hasCredential: boolean,
+  threshold: number,
 ): CodexAuthAccountDto {
   const quota = quotaForPlan(quotaResult.quota, account.plan);
   const needsReauth = !hasCredential || quotaResult.needsReauth || isAccountNeedsReauth(account.id);
   const health = projectCodexAccountHealth({ accountId: account.id, needsReauth });
+  const recovery = quotaRecoveryForAccount(quota, threshold, hasCredential, needsReauth);
   return {
     id: account.id,
     email: maskEmail(account.email) ?? account.email,
@@ -109,6 +155,7 @@ function poolAccountDto(
     quota: quota ? { ...quota } : null,
     needsReauth,
     hasCredential,
+    ...recovery,
     ...oauthAccountHealthFields("codex", account.id, health),
   };
 }
@@ -378,6 +425,8 @@ export interface CodexAuthAccountDto {
   healthLabel: OAuthHealthLabel;
   healthSummary: string;
   healthAction?: string;
+  quotaHealth: CodexQuotaHealth;
+  recoveryEligible: boolean;
 }
 
 async function fetchPoolAccountQuota(accountId: string, forceRefresh = false, configuredPlan?: string): Promise<PoolQuotaResult> {
@@ -473,6 +522,7 @@ export function clearCodexQuotaPrimeState(): void {
 
 export async function listCodexAuthAccounts(config: OcxConfig, forceRefresh = false): Promise<CodexAuthAccountDto[]> {
   const runtimeConfig = getRuntimeConfig(config);
+  const threshold = runtimeConfig.autoSwitchThreshold ?? 80;
   const poolAccounts = (runtimeConfig.codexAccounts ?? []).filter(a => !a.isMain);
   const mainInfo = await fetchMainAccountInfo(forceRefresh);
   const withQuota = await mapWithConcurrency(poolAccounts, POOL_QUOTA_REFRESH_CONCURRENCY, async a => {
@@ -480,7 +530,7 @@ export async function listCodexAuthAccounts(config: OcxConfig, forceRefresh = fa
     const quotaResult = cred
       ? await fetchPoolAccountQuota(a.id, forceRefresh, a.plan)
       : { quota: null, needsReauth: true };
-    return poolAccountDto(a, quotaResult, !!cred);
+    return poolAccountDto(a, quotaResult, !!cred, threshold);
   });
   const hasMainCredential = readCodexTokens() !== null;
   const mainNeedsReauth = !hasMainCredential || isAccountNeedsReauth(MAIN_CODEX_ACCOUNT_ID);
@@ -488,6 +538,10 @@ export async function listCodexAuthAccounts(config: OcxConfig, forceRefresh = fa
     accountId: MAIN_CODEX_ACCOUNT_ID,
     needsReauth: mainNeedsReauth,
   });
+  const mainQuota = mainInfo.quota
+    ? { ...quotaForPlan({ ...mainInfo.quota, updatedAt: Date.now() }, mainInfo.plan) }
+    : null;
+  const mainRecovery = quotaRecoveryForAccount(mainQuota, threshold, hasMainCredential, mainNeedsReauth);
   const main: CodexAuthAccountDto = {
     id: MAIN_CODEX_ACCOUNT_ID,
     email: maskEmail(mainInfo.email) ?? "Codex App login",
@@ -495,7 +549,8 @@ export async function listCodexAuthAccounts(config: OcxConfig, forceRefresh = fa
     isMain: true,
     hasCredential: hasMainCredential,
     needsReauth: mainNeedsReauth,
-    quota: mainInfo.quota ? { ...quotaForPlan({ ...mainInfo.quota, updatedAt: Date.now() }, mainInfo.plan) } : null,
+    quota: mainQuota,
+    ...mainRecovery,
     ...oauthAccountHealthFields("codex", MAIN_CODEX_ACCOUNT_ID, mainHealth),
   };
   return [main, ...withQuota];

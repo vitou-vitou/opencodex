@@ -6,7 +6,7 @@ import { CODEX_ACCOUNT_LOG_LABEL_RE } from "../src/codex/account-label";
 import {
   handleCodexAuthAPI, updateAccountQuota, getAccountQuota,
   checkAccountIdCollision, getMainChatgptAccountId,
-  markAccountNeedsReauth, isAccountNeedsReauth, clearAccountNeedsReauth, clearAccountQuota,
+  markAccountNeedsReauth, isAccountNeedsReauth, clearAccountNeedsReauth, clearAccountQuota, setAccountQuotaFromParsed,
   maskEmail,
 } from "../src/codex/auth-api";
 import { getCodexAccountCredential, readCodexAccountRecord, saveCodexAccountCredential } from "../src/codex/account-store";
@@ -1580,6 +1580,52 @@ describe("codex-auth API", () => {
     } finally {
       globalThis.fetch = originalFetch;
     }
+  });
+
+  test("GET /api/codex-auth/accounts projects redacted quota recovery state", async () => {
+    const config = makeConfig({ autoSwitchThreshold: 80 });
+    seedPoolAccount(config, {
+      id: "recovery-pool",
+      email: "recovery-owner@example.test",
+      accessToken: "access-recovery-secret",
+      refreshToken: "refresh-recovery-secret",
+      chatgptAccountId: "acct-recovery-raw-id",
+    });
+    setAccountQuotaFromParsed("recovery-pool", {
+      weeklyPercent: 91,
+      weeklyResetAt: 1_800_000_000_000,
+      monthlyPercent: 20,
+      monthlyResetAt: 1_900_000_000_000,
+    });
+
+    const req = new Request("http://localhost/api/codex-auth/accounts", { method: "GET" });
+    const resp = await handleCodexAuthAPI(req, new URL(req.url), config);
+    const serialized = await resp!.text();
+    const data = JSON.parse(serialized) as {
+      accounts: Array<{
+        id: string;
+        email: string;
+        quotaHealth?: unknown;
+        recoveryEligible?: unknown;
+      }>;
+    };
+    const pool = data.accounts.find(account => account.id === "recovery-pool");
+
+    expect(pool).toMatchObject({
+      email: "r***r@example.test",
+      quotaHealth: {
+        status: "critical",
+        percent: 91,
+        windowLabel: "weekly",
+        resetAt: 1_800_000_000_000,
+        action: "switch_account",
+      },
+      recoveryEligible: true,
+    });
+    expect(serialized).not.toContain("access-recovery-secret");
+    expect(serialized).not.toContain("refresh-recovery-secret");
+    expect(serialized).not.toContain("acct-recovery-raw-id");
+    expect(serialized).not.toContain("recovery-owner@example.test");
   });
 
   test("GET /api/codex-auth/accounts does not mark reauth on refresh generation conflict", async () => {
