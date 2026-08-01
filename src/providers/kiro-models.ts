@@ -1,6 +1,18 @@
 export const KIRO_MODELS = [
   "kiro-auto",
-  // OpenAI GPT-5.6 (Kiro experimental, us-east-1) — added to official catalog 2026-07-13
+  // Probe 2026-08-01 (us-east-1 Kiro login via ocx /v1/messages): only these IDs returned 200.
+  // Docs-listed Claude Opus / newer Sonnet / GPT-5.6 tiers were rejected as INVALID_MODEL_ID.
+  "claude-sonnet-4.5",
+  "claude-haiku-4.5",
+  "deepseek-3.2",
+  "minimax-m2.5",
+  "minimax-m2.1",
+  "glm-5",
+  "qwen3-coder-next",
+];
+
+/** Model IDs pruned after live INVALID_MODEL_ID probe — must stay out of KIRO_MODELS. */
+export const KIRO_PRUNED_INVALID_MODEL_IDS = [
   "gpt-5.6-sol",
   "gpt-5.6-terra",
   "gpt-5.6-luna",
@@ -11,32 +23,14 @@ export const KIRO_MODELS = [
   "claude-opus-4.6",
   "claude-opus-4.5",
   "claude-sonnet-4.6",
-  "claude-sonnet-4.5",
   "claude-sonnet-4.0",
-  "claude-haiku-4.5",
-  "deepseek-3.2",
-  "minimax-m2.5",
-  "minimax-m2.1",
-  "glm-5",
-  "qwen3-coder-next",
-];
+] as const;
 
 // Per-model context windows as documented on Kiro's official model catalog
 // (https://kiro.dev/docs/models/ — "Quick comparison", page updated 2026-07-14).
 // "Auto" is a router with no fixed window on Kiro's table, so it is intentionally omitted.
 export const KIRO_MODEL_CONTEXT_WINDOWS: Record<string, number> = {
-  "gpt-5.6-sol": 272_000,
-  "gpt-5.6-terra": 272_000,
-  "gpt-5.6-luna": 272_000,
-  "claude-sonnet-5": 1_000_000,
-  "claude-opus-5": 1_000_000,
-  "claude-opus-4.8": 1_000_000,
-  "claude-opus-4.7": 1_000_000,
-  "claude-opus-4.6": 1_000_000,
-  "claude-opus-4.5": 200_000,
-  "claude-sonnet-4.6": 1_000_000,
   "claude-sonnet-4.5": 200_000,
-  "claude-sonnet-4.0": 200_000,
   "claude-haiku-4.5": 200_000,
   "deepseek-3.2": 128_000,
   "minimax-m2.5": 200_000,
@@ -47,9 +41,8 @@ export const KIRO_MODEL_CONTEXT_WINDOWS: Record<string, number> = {
 
 const KIRO_REASONING_EFFORTS = ["low", "medium", "high", "xhigh", "max"];
 
-// gpt-5.6-sol and claude-opus-5 send these values through Kiro's verified native effort fields
-// (`reasoning.effort` and `output_config.effort` respectively). Other models map them to bounded
-// thinking instructions until their native effort support is verified.
+// Remaining catalog models map efforts to bounded thinking instructions until native
+// effort support is verified for these IDs.
 export const KIRO_MODEL_REASONING_EFFORTS: Record<string, string[]> = Object.fromEntries(
   KIRO_MODELS.map(id => [id, KIRO_REASONING_EFFORTS]),
 );

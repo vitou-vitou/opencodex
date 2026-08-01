@@ -650,8 +650,8 @@ describe("kiro adapter — native and emulated reasoning effort", () => {
 
   test("kiro advertises Codex-compatible reasoning efforts", async () => {
     expect(kiro).toBeTruthy();
-    expect(configuredReasoningEfforts(kiro, "claude-opus-4.8")).toEqual(["low", "medium", "high", "xhigh", "max"]);
-    expect(configuredReasoningEfforts(kiro, "claude-opus-4.5")).toEqual(["low", "medium", "high", "xhigh", "max"]);
+    expect(configuredReasoningEfforts(kiro, "claude-sonnet-4.5")).toEqual(["low", "medium", "high", "xhigh", "max"]);
+    expect(configuredReasoningEfforts(kiro, "claude-haiku-4.5")).toEqual(["low", "medium", "high", "xhigh", "max"]);
     expect(configuredReasoningEfforts(kiro, "kiro-auto")).toEqual(["low", "medium", "high", "xhigh", "max"]);
   });
 
@@ -659,16 +659,16 @@ describe("kiro adapter — native and emulated reasoning effort", () => {
     const model = applyProviderConfigHints(
       "kiro",
       kiro,
-      { provider: "kiro", id: "gpt-5.6-sol" },
+      { provider: "kiro", id: "claude-sonnet-4.5" },
     );
-    const entry = buildCatalogEntries(null, [], [model]).find(candidate => candidate.slug === "kiro/gpt-5.6-sol");
+    const entry = buildCatalogEntries(null, [], [model]).find(candidate => candidate.slug === "kiro/claude-sonnet-4.5");
 
     expect(model.supportsVerbosity).toBe(false);
     expect(entry?.support_verbosity).toBe(false);
   });
 
   test("mapReasoningEffort keeps xhigh and max as distinct labels", async () => {
-    expect(mapReasoningEffort(kiro, "claude-opus-4.8", "xhigh")).toBe("xhigh");
+    expect(mapReasoningEffort(kiro, "claude-sonnet-4.5", "xhigh")).toBe("xhigh");
     expect(mapReasoningEffort(kiro, "deepseek-3.2", "max")).toBe("max");
   });
 
@@ -750,33 +750,26 @@ describe("kiro adapter — per-model context windows (kiro.dev/docs/models)", ()
   const kiro = PROVIDER_REGISTRY.find(p => p.id === "kiro") as unknown as OcxProviderConfig;
   const cw = kiro.modelContextWindows ?? {};
 
-  test("registry includes the currently documented Kiro models", () => {
+  test("registry includes probe-verified Kiro models", () => {
     for (const id of [
-      "gpt-5.6-sol",
-      "gpt-5.6-terra",
-      "gpt-5.6-luna",
-      "claude-opus-4.5",
-      "claude-sonnet-4.0",
+      "kiro-auto",
+      "claude-sonnet-4.5",
+      "claude-haiku-4.5",
       "minimax-m2.1",
+      "deepseek-3.2",
     ]) {
       expect(kiro.models ?? []).toContain(id);
     }
   });
 
-  test("1M-context models map to 1_000_000", () => {
-    for (const id of ["claude-sonnet-5", "claude-opus-5", "claude-opus-4.8", "claude-opus-4.7", "claude-opus-4.6", "claude-sonnet-4.6"]) {
-      expect(kiro.models ?? []).toContain(id);
-      expect(cw[id]).toBe(1_000_000);
+  test("pruned INVALID_MODEL_ID ids are absent from the registry catalog", () => {
+    for (const id of ["claude-opus-4.8", "claude-sonnet-4.6", "gpt-5.6-sol", "claude-sonnet-5"]) {
+      expect(kiro.models ?? []).not.toContain(id);
     }
   });
 
-  test("smaller-context models match Kiro's published limits", () => {
-    expect(cw["gpt-5.6-sol"]).toBe(272_000);
-    expect(cw["gpt-5.6-terra"]).toBe(272_000);
-    expect(cw["gpt-5.6-luna"]).toBe(272_000);
-    expect(cw["claude-opus-4.5"]).toBe(200_000);
+  test("remaining models match Kiro's published context limits", () => {
     expect(cw["claude-sonnet-4.5"]).toBe(200_000);
-    expect(cw["claude-sonnet-4.0"]).toBe(200_000);
     expect(cw["claude-haiku-4.5"]).toBe(200_000);
     expect(cw["minimax-m2.5"]).toBe(200_000);
     expect(cw["minimax-m2.1"]).toBe(200_000);
