@@ -7,6 +7,14 @@ import type {
 } from "../types";
 import { DESKTOP_FAMILIES } from "./desktop-profile";
 import { resolveDesktop3pAlias } from "./desktop-3p";
+import {
+  arenaMaxAgeHours,
+  buildArenaSnapshotFromText,
+  fetchArenaTextLeaderboard,
+  isArenaSnapshotStale,
+  type CatalogModelRef,
+  type OcxArenaSnapshot,
+} from "./arena-rank";
 
 export const DEFAULT_ROUTE_THRESHOLD = 90;
 export const DEFAULT_ROUTE_MAX_HOPS = 3;
@@ -15,36 +23,30 @@ export const DEFAULT_ROUTE_MAX_HOPS = 3;
 export const DESKTOP_CHAIN_FAMILIES = DESKTOP_FAMILIES;
 
 /**
- * Recommended reactive chains for Desktop family keys.
+ * Recommended reactive chains for Desktop family keys (offline fallback).
  *
  * Candidate order follows arena.ai text leaderboard Elo among models reachable via
- * kiro + xai catalogs (snapshot 2026-08-01, https://arena.ai/leaderboard/text):
- *   grok-4.5 ~#33 Elo 1469 → glm-5 ~#48 Elo 1457 → claude-sonnet-4.5 ~#53 Elo 1455
- *   → deepseek-v3.2 / kiro deepseek-3.2 ~#96 Elo 1425 → claude-haiku-4.5 ~#120 Elo 1412
- *   → minimax-m2.5 ~#148 Elo 1390
+ * kiro + xai catalogs (snapshot 2026-08-01, https://arena.ai/leaderboard/text).
+ * Prefer a live `arenaSnapshot` from `refresh-arena` when present.
  *
  * Merged only for missing keys unless `ensure-chains --replace` (never clobber by default).
  */
 export const RECOMMENDED_FAMILY_CHAINS: Record<OcxClaudeDesktopFamily, OcxClaudeRouteCandidate[]> = {
-  // Flagship: highest arena Elo first.
   opus: [
     { provider: "xai", model: "grok-4.5" },
     { provider: "kiro", model: "glm-5" },
     { provider: "kiro", model: "claude-sonnet-4.5" },
   ],
-  // Mid tier: same top arena slate (best available quality under sonnet slot).
   sonnet: [
     { provider: "xai", model: "grok-4.5" },
     { provider: "kiro", model: "glm-5" },
     { provider: "kiro", model: "claude-sonnet-4.5" },
   ],
-  // Light tier: arena order among faster/cheaper kiro models (no Grok — keep haiku-cost shape).
   haiku: [
     { provider: "kiro", model: "deepseek-3.2" },
     { provider: "kiro", model: "claude-haiku-4.5" },
     { provider: "kiro", model: "minimax-m2.5" },
   ],
-  // Fable slot: best arena among xai + kiro (Anthropic Fable #1 omitted unless anthropic is configured).
   fable: [
     { provider: "xai", model: "grok-4.5" },
     { provider: "kiro", model: "glm-5" },
@@ -88,13 +90,6 @@ export function chainForModel(
   return chain.length > 0 ? chain : null;
 }
 
-/**
- * Ordered chain lookup keys for an inbound Claude model id.
- *
- * Order: exact id → Desktop family (`opus`/`sonnet`/`haiku`/`fable`) → date-stripped id.
- * Family is resolved before date-strip so Desktop date aliases
- * (`claude-opus-4-8-2026MMDD`) do not all collapse onto a single `claude-opus-4-8` chain.
- */
 export function resolveChainLookupIds(
   requestedModel: string,
   config: OcxConfig,
@@ -143,7 +138,6 @@ function familiesForDesktopRequest(
   return found;
 }
 
-/** First matching chain across {@link resolveChainLookupIds} order. */
 export function chainForRequest(
   routing: OcxClaudeCodeRouting | undefined,
   requestedModel: string,
@@ -156,15 +150,32 @@ export function chainForRequest(
   return null;
 }
 
-/**
- * Merge recommended family chains into routing.
- * @param replace When true, overwrite family keys with the recommended template.
- *   When false (default), only fill missing / empty keys.
- */
+/** Template used by ensure-chains: live snapshot chains when present, else static fallback. */
+export function recommendedFamilyTemplate(
+  routing: OcxClaudeCodeRouting | undefined,
+): Record<OcxClaudeDesktopFamily, OcxClaudeRouteCandidate[]> {
+  const snap = routing?.arenaSnapshot?.chains;
+  if (!snap) return RECOMMENDED_FAMILY_CHAINS;
+  const out = {} as Record<OcxClaudeDesktopFamily, OcxClaudeRouteCandidate[]>;
+  let any = false;
+  for (const family of DESKTOP_FAMILIES) {
+    const raw = snap[family];
+    const chain = Array.isArray(raw) ? raw.filter(isValidCandidate) : [];
+    if (chain.length > 0) {
+      out[family] = chain.map(c => ({ ...c }));
+      any = true;
+    } else {
+      out[family] = RECOMMENDED_FAMILY_CHAINS[family].map(c => ({ ...c }));
+    }
+  }
+  return any ? out : RECOMMENDED_FAMILY_CHAINS;
+}
+
 export function mergeRecommendedFamilyChains(
   routing: OcxClaudeCodeRouting | undefined,
   replace = false,
 ): { routing: OcxClaudeCodeRouting; added: OcxClaudeDesktopFamily[]; replaced: OcxClaudeDesktopFamily[] } {
+  const template = recommendedFamilyTemplate(routing);
   const chains: Record<string, OcxClaudeRouteCandidate[]> = { ...(routing?.chains ?? {}) };
   const added: OcxClaudeDesktopFamily[] = [];
   const replaced: OcxClaudeDesktopFamily[] = [];
@@ -173,7 +184,7 @@ export function mergeRecommendedFamilyChains(
     if (existing && !replace) continue;
     if (existing && replace) replaced.push(family);
     else if (!existing) added.push(family);
-    chains[family] = RECOMMENDED_FAMILY_CHAINS[family].map(c => ({ ...c }));
+    chains[family] = template[family].map(c => ({ ...c }));
   }
   return {
     routing: {
@@ -185,7 +196,6 @@ export function mergeRecommendedFamilyChains(
   };
 }
 
-/** Apply recommended family chains onto config (in memory). */
 export function ensureRecommendedFamilyChains(
   config: OcxConfig,
   replace = false,
@@ -194,4 +204,57 @@ export function ensureRecommendedFamilyChains(
   if (added.length === 0 && replaced.length === 0) return { added: [], replaced: [] };
   config.claudeCode = { ...(config.claudeCode ?? {}), routing };
   return { added, replaced };
+}
+
+export function persistArenaSnapshot(config: OcxConfig, snapshot: OcxArenaSnapshot): void {
+  const routing = { ...(config.claudeCode?.routing ?? {}) };
+  routing.arenaSnapshot = {
+    fetchedAt: snapshot.fetchedAt,
+    source: snapshot.source,
+    chains: snapshot.chains,
+    matchedCount: snapshot.matchedCount,
+  };
+  config.claudeCode = { ...(config.claudeCode ?? {}), routing };
+}
+
+export type RefreshArenaResult =
+  | { ok: true; snapshot: OcxArenaSnapshot; refreshed: boolean }
+  | { ok: false; error: string; refreshed: false };
+
+/**
+ * Fetch arena + build snapshot for the given catalog.
+ * Does not mutate config unless caller persists.
+ */
+export async function refreshArenaSnapshot(
+  catalog: readonly CatalogModelRef[],
+  opts?: { fetchImpl?: typeof fetch; text?: string },
+): Promise<RefreshArenaResult> {
+  try {
+    const text = opts?.text ?? await fetchArenaTextLeaderboard(opts?.fetchImpl);
+    const snapshot = buildArenaSnapshotFromText(text, catalog);
+    return { ok: true, snapshot, refreshed: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e), refreshed: false };
+  }
+}
+
+/**
+ * If snapshot missing/stale, attempt one best-effort refresh and persist on success.
+ * Never throws; returns whether a network refresh ran.
+ */
+export async function maybeStaleArenaRefresh(
+  config: OcxConfig,
+  catalog: readonly CatalogModelRef[],
+  opts?: { fetchImpl?: typeof fetch; nowMs?: number },
+): Promise<{ attempted: boolean; updated: boolean; error?: string }> {
+  const routing = config.claudeCode?.routing;
+  const maxAge = arenaMaxAgeHours(routing?.arenaMaxAgeHours);
+  const snap = routing?.arenaSnapshot as OcxArenaSnapshot | undefined;
+  if (!isArenaSnapshotStale(snap, maxAge, opts?.nowMs)) {
+    return { attempted: false, updated: false };
+  }
+  const result = await refreshArenaSnapshot(catalog, { fetchImpl: opts?.fetchImpl });
+  if (!result.ok) return { attempted: true, updated: false, error: result.error };
+  persistArenaSnapshot(config, result.snapshot);
+  return { attempted: true, updated: true };
 }

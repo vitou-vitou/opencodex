@@ -123,10 +123,13 @@ body-occupancy guard):
 | `maxHops?` | `number` | `3` | Max candidate tries per request (clamped ≥ 1). |
 | `threshold?` | `number` | `90` | Proactive skip when a candidate reports quota% ≥ this value. Cross-provider quota is only partially wired; failover is primarily reactive (429/401/403/5xx). |
 | `pin?` | `{provider, hard} \| null` | unset | Soft pin prefers a provider but still hops; hard pin locks and errors instead of hopping. |
+| `arenaSnapshot?` | `{ fetchedAt, source, chains, matchedCount? }` | unset | Cached arena.ai text ranking → family chains. Written by `ocx claude route refresh-arena`. |
+| `arenaMaxAgeHours?` | `number` | `168` | Age after which `ensure-chains` best-effort refreshes the arena snapshot (no background daemon). |
 
-Install recommended Desktop family chains (arena.ai-ranked kiro + xai) without overwriting
-existing keys via `ocx claude route ensure-chains`, or refresh with `--replace`. Desktop apply
-merges missing keys only. Full guide: [Provider failover](/guides/claude-code/#provider-failover).
+Install recommended Desktop family chains via `ocx claude route ensure-chains` (uses live
+`arenaSnapshot` when present, else static offline template). Refresh ranks with
+`ocx claude route refresh-arena [--apply] [--replace]`. Full guide:
+[Provider failover](/guides/claude-code/#provider-failover).
 
 ### Managed record shapes
 

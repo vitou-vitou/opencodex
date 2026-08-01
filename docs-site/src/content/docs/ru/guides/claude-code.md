@@ -364,7 +364,7 @@ id/name; именованный `tool_choice` без имени.
 
 Через `claudeCode.routing.chains` запросы `/v1/messages` можно по очереди направлять на
 несколько апстримов. Ключи семейств Desktop (`opus` / `sonnet` / `haiku` / `fable`),
-рекомендуемый шаблон по рейтингу arena.ai и `ocx claude route ensure-chains [--replace]` описаны в английской
+рекомендуемый шаблон по рейтингу arena.ai и `ocx claude route refresh-arena` / `ensure-chains` описаны в английской
 документации: [Provider failover](/guides/claude-code/#provider-failover).
 
 ## Устранение неполадок

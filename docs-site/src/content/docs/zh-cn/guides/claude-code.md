@@ -339,7 +339,7 @@ context/blocklist/compact-window 值。
 
 可通过 `claudeCode.routing.chains` 让 `/v1/messages` 按顺序切换上游。Desktop 家族键
 （`opus` / `sonnet` / `haiku` / `fable`）、按 arena.ai 排名的推荐链路以及
-`ocx claude route ensure-chains [--replace]` 的完整说明见英文指南
+`ocx claude route refresh-arena` / `ensure-chains` 的完整说明见英文指南
 [Provider failover](/guides/claude-code/#provider-failover)。
 
 ## 故障排除

@@ -380,7 +380,7 @@ ID, 별칭, 포트를 반환해요. `PUT /api/claude-code`는 부분 업데이�
 
 `claudeCode.routing.chains`로 `/v1/messages` 요청을 여러 업스트림에 순서대로 넘길 수 있어요.
 Desktop 패밀리 키(`opus` / `sonnet` / `haiku` / `fable`)와 arena.ai 순위 기반 권장 체인·CLI
-(`ocx claude route ensure-chains [--replace]`) 설명은 영어 가이드
+(`ocx claude route refresh-arena` / `ensure-chains`) 설명은 영어 가이드
 [Provider failover](/guides/claude-code/#provider-failover)를 보세요.
 
 ## 문제 해결

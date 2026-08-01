@@ -285,7 +285,22 @@ flagship/mid slots; haiku uses the lighter arena band `deepseek-3.2` → `claude
 
 Applying a Desktop profile (or running `ocx claude route ensure-chains`) merges this template for
 any **missing** family keys only. Use `ocx claude route ensure-chains --replace` to refresh an
-older template to the arena order:
+older template.
+
+### Live arena refresh
+
+Rankings are **not** polled in the background. Refresh on demand:
+
+```bash
+ocx claude route refresh-arena              # fetch arena.ai text board → save arenaSnapshot
+ocx claude route refresh-arena --apply      # also merge missing family chain keys
+ocx claude route refresh-arena --apply --replace  # overwrite family keys from the snapshot
+```
+
+`ensure-chains` best-effort refreshes when `arenaSnapshot` is missing or older than
+`claudeCode.routing.arenaMaxAgeHours` (default **168**). On network/parse failure it falls back to
+the cached snapshot, then the static offline template. CI and offline boxes keep working without
+arena.ai.
 
 ```json
 {
@@ -396,11 +411,13 @@ ocx claude use <provider> [--hard]   # Pin to a provider (soft = preference, sti
 ocx claude use auto                  # Clear the pin (auto-failover, no manual lock)
 ocx claude route status              # Show chains, active pin, live health, cooldown TTLs
 ocx claude route ensure-chains [--replace]  # Merge arena-ranked family chains; --replace overwrites
+ocx claude route refresh-arena [--apply] [--replace]  # Fetch arena.ai ranks into snapshot
 ocx claude route clear-cooldowns     # Reset all live route cooldowns
 ```
 
 Desktop apply (`ocx claude desktop apply` or the dashboard Apply action) also merges missing
-recommended family chains (does not overwrite; use `ensure-chains --replace` to refresh order).
+recommended family chains (does not overwrite; use `ensure-chains --replace` or
+`refresh-arena --apply --replace` to refresh order).
 
 A soft pin (`--hard` omitted) uses the selected provider but still fails over if it errors. A hard pin
 (`--hard` included) locks the provider and returns an error if it fails.

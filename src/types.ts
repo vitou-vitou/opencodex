@@ -463,6 +463,18 @@ export interface OcxClaudeCodeRouting {
   chains?: Record<string, OcxClaudeRouteCandidate[]>;
   /** Manual override; soft = preference (still hops), hard = lock. null/absent = auto. */
   pin?: { provider: string; hard: boolean } | null;
+  /**
+   * Cached arena.ai text leaderboard → family chain recommendations.
+   * Written by `ocx claude route refresh-arena` (and stale ensure-chains refresh).
+   */
+  arenaSnapshot?: {
+    fetchedAt: string;
+    source: string;
+    chains: Record<string, OcxClaudeRouteCandidate[]>;
+    matchedCount?: number;
+  };
+  /** Hours before ensure-chains attempts a best-effort arena refresh. Default 168. */
+  arenaMaxAgeHours?: number;
 }
 
 export type OcxClaudeDesktopFamily = "opus" | "fable" | "sonnet" | "haiku";

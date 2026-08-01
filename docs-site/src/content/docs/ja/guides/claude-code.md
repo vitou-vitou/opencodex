@@ -343,7 +343,7 @@ ID、エイリアス、ポートを返します。`PUT /api/claude-code` は部�
 
 `claudeCode.routing.chains` で `/v1/messages` を複数アップストリームへ順に切り替えられます。
 Desktop ファミリーキー（`opus` / `sonnet` / `haiku` / `fable`）、arena.ai 順位ベースの推奨チェーン、
-`ocx claude route ensure-chains [--replace]` の詳細は英語ガイド
+`ocx claude route refresh-arena` / `ensure-chains` の詳細は英語ガイド
 [Provider failover](/guides/claude-code/#provider-failover) を参照してください。
 
 ## トラブルシューティング
