@@ -9,11 +9,15 @@
 import { FORWARD_HEADERS } from "../adapters/openai-responses";
 import { enforceAnthropicImageLimits } from "../adapters/anthropic-image-guard";
 import { normalizeAnthropicImages } from "../adapters/anthropic-image-normalize";
-import { AnthropicRequestError, anthropicToResponsesTranslation, extractOcxRouteDirective, resolveInboundModel, type ClaudeCacheKeySource } from "../claude/inbound";
+import { AnthropicRequestError, anthropicToResponsesTranslation, extractOcxRouteDirective, resolveClaudeRoute, resolveInboundModel } from "../claude/inbound";
 import { resolveDesktop3pAlias } from "../claude/desktop-3p";
 import { recordDesktopRequest } from "../claude/desktop-health";
 import { stripOneMillionMarker } from "../claude/context-windows";
 import { captureClaudeInbound } from "../claude/inbound-debug";
+import { NoHealthyRouteError } from "../claude/route-selector";
+import { buildRouteSnapshot, liveRouteHealthSources } from "../claude/route-health";
+import { coolCandidate, ttlForStatus } from "../claude/route-cooldowns";
+import { normalizeRouting } from "../claude/route-chains";
 import { isTransientUpstreamStatus } from "../lib/upstream-retry";
 import { resolveClientRetryAfter } from "../lib/retry-after";
 import {
@@ -522,7 +526,6 @@ export async function handleClaudeMessages(
 
   let anthropicBody: unknown;
   let internalBody: Rec;
-  let cacheKeySource: ClaudeCacheKeySource = null;
   try {
     anthropicBody = await readAnthropicBody(req);
     // Defensive [1m] strip (devlog 138): clients normally remove the context-variant
@@ -567,9 +570,9 @@ export async function handleClaudeMessages(
     if (isRec(anthropicBody) && wantsNativePassthrough(req, config, anthropicBody.model)) {
       return await anthropicNativePassthrough(req, config, logCtx, logIds, anthropicBody, "/v1/messages");
     }
-    const translation = anthropicToResponsesTranslation(anthropicBody, config.claudeCode);
-    internalBody = translation.body;
-    cacheKeySource = translation.cacheKeySource;
+    // Validate/translate up front so malformed bodies still 400 here; the actual
+    // replay body is re-translated fresh per hop below (attemptReplay).
+    internalBody = anthropicToResponsesTranslation(anthropicBody, config.claudeCode).body;
   } catch (err) {
     const status = err instanceof AnthropicRequestError ? 400 : 500;
     if (logIds) addFinalRequestLog(logIds.requestId, logIds.start, logCtx, status, { closeReason: "non_stream" });
@@ -577,94 +580,13 @@ export async function handleClaudeMessages(
   }
 
   const requestedModel = (anthropicBody as Rec).model as string;
+  // Canonical id for chain lookup — requestedModel is already [1m]-stripped upstream,
+  // but not alias/modelMap-resolved (chain keys match the raw client-facing id).
+  const canonicalId = requestedModel.replace(/-\d{8}$/, "");
+  // Routed adapters only support streamed turns; each replay attempt forces
+  // body.stream = true internally (attemptReplay) and this flag folds the
+  // translated Anthropic SSE into a message JSON for non-streaming clients.
   const stream = internalBody.stream === true;
-  // Routed adapters only support streamed turns; always stream internally and fold
-  // the translated Anthropic SSE into a message JSON for non-streaming clients.
-  internalBody.stream = true;
-
-  // Native ChatGPT passthrough (openai-responses forward) accepts only Codex-shaped
-  // bodies: it 400s on sampling params ("Unsupported parameter: max_output_tokens",
-  // verified live 2026-07-11). Strip them for that route; routed providers keep them.
-  let nativeRoute = false;
-  try {
-    const route = routeModel(config, internalBody.model as string);
-    // Settle the wire once so the sampling decision below reads the effective
-    // adapter rather than the provider-wide default (#404).
-    route.provider = resolveWireProtocolOverride(route.providerName, route.modelId, route.provider);
-    if (route.provider.adapter === "openai-responses") {
-      nativeRoute = true;
-      delete internalBody.max_output_tokens;
-      delete internalBody.temperature;
-      delete internalBody.top_p;
-      delete internalBody.stop;
-      delete internalBody.user;
-    }
-    // Estimated-usage adapters (cursor/kiro) report no per-turn input tokens; stash a
-    // request-side estimate so the log's in:0 rows get a floor. NEVER set this for
-    // accurate-usage adapters — the request-log merge is max(reported, estimate) and
-    // would overwrite real usage (audit 133 R1#7).
-    if (route.provider.adapter === "cursor" || route.provider.adapter === "kiro") {
-      const raw = anthropicBody as Rec;
-      const parts: string[] = [];
-      if (raw.system !== undefined) parts.push(typeof raw.system === "string" ? raw.system : JSON.stringify(raw.system));
-      if (raw.messages !== undefined) parts.push(JSON.stringify(raw.messages));
-      if (raw.tools !== undefined) parts.push(JSON.stringify(raw.tools));
-      logCtx.usageLogInputTokens = Math.max(1, estimateTokens(parts.join("\n"), requestedModel));
-    }
-    // Effort safety valve (devlog 136 B6, audit 139 R2#2): opus-shaped aliases make
-    // every routed model look like a reasoning model to Claude clients, so a forced
-    // effort (CLAUDE_CODE_ALWAYS_ENABLE_EFFORT) would leak reasoning params to routes
-    // that affirmatively expose NO effort control. Strip only on a definitive [] from
-    // supportedLadderFor; unknown (undefined) passes through untouched.
-    if (internalBody.reasoning !== undefined) {
-      const { supportedLadderFor } = await import("./effort-policy");
-      const ladder = supportedLadderFor({ provider: route.provider, modelId: route.modelId });
-      if (ladder !== undefined && ladder.length === 0) delete internalBody.reasoning;
-    }
-  } catch { /* unknown model: let handleResponses shape the 404 */ }
-
-  const headers = new Headers({ "content-type": "application/json" });
-  for (const name of FORWARD_HEADERS) {
-    // The caller's bearer is the proxy admission token (ocx claude placeholder), never a
-    // ChatGPT credential — forwarding it upstream turns into {"detail":"Unauthorized"}.
-    if (name === "authorization") continue;
-    const value = req.headers.get(name);
-    if (value) headers.set(name, value);
-  }
-  if (!nativeRoute) {
-    // Routed replays need main ChatGPT auth so OpenAI-backed sidecars remain reachable.
-    const { getMainAccountToken } = await import("../codex/main-account");
-    const token = getMainAccountToken();
-    if (token) {
-      headers.set("authorization", `Bearer ${token.accessToken}`);
-      headers.set("chatgpt-account-id", token.chatgptAccountId);
-    }
-  }
-  if (nativeRoute) {
-    // No forwarded ChatGPT auth exists on this surface. Attach the main codex login
-    // (read-only auth.json token); account-pool rotation still overrides downstream.
-    const { getMainAccountToken } = await import("../codex/main-account");
-    const token = getMainAccountToken();
-    if (token) {
-      headers.set("authorization", `Bearer ${token.accessToken}`);
-      headers.set("chatgpt-account-id", token.chatgptAccountId);
-    }
-    // ChatGPT-backend prompt-cache affinity rides the session_id HEADER (codex
-    // clients always send their session uuid; devlog 090 follow-up: body-level
-    // prompt_cache_key alone still yielded cached_tokens:0). Claude Code never sends
-    // the header, so synthesize a stable per-session uuid from the same cache key —
-    // but ONLY for a real per-session key (metadata.user_id). The system-hash fallback
-    // key is shared across Desktop conversations, and a shared session_id's backend
-    // semantics are unproven (audit 133 R2#3): body prompt_cache_key only there.
-    if (cacheKeySource === "metadata" && !headers.has("session_id") && typeof internalBody.prompt_cache_key === "string") {
-      headers.set("session_id", uuidFromHex(internalBody.prompt_cache_key));
-    }
-  }
-  const internalReq = new Request("http://localhost/v1/responses", {
-    method: "POST",
-    headers,
-    body: JSON.stringify(internalBody),
-  });
 
   // Request-log wiring mirrors the /v1/responses route: native passthrough finalizes
   // via the terminal callbacks; routed streams get the Responses-vocabulary log tap
@@ -676,12 +598,148 @@ export async function handleClaudeMessages(
     nativeLogged = true;
     addFinalRequestLog(logIds.requestId, logIds.start, logCtx, status, meta);
   };
-  const upstream = await handleResponses(internalReq, buildClaudeReplayConfig(config), logCtx, {
-    abortSignal: req.signal,
-    ...(logIds ? { onFirstOutput: () => recordFirstOutput(logCtx, logIds.start) } : {}),
-    onNativePassthroughTerminal: status => finalizeNativeLog(httpStatusForTerminalStatus(status), { terminalStatus: status, closeReason: "terminal" }),
-    onNativePassthroughCancel: () => finalizeNativeLog(499, { closeReason: "client_cancel" }),
-  });
+
+  // Replay a single hop. A FRESH translation runs every call — routeModel below
+  // mutates the translated body in place (native-route sampling-param stripping),
+  // so a re-hopped attempt must not inherit a previous hop's mutations. When
+  // `routeKey` is set (a failover chain applies), it overrides the translated
+  // model before routing.
+  async function attemptReplay(routeKey: string | null): Promise<Response> {
+    const t = anthropicToResponsesTranslation(anthropicBody, config.claudeCode);
+    const body = t.body;
+    body.stream = true;
+    if (routeKey) body.model = routeKey;
+
+    // Native ChatGPT passthrough (openai-responses forward) accepts only Codex-shaped
+    // bodies: it 400s on sampling params ("Unsupported parameter: max_output_tokens",
+    // verified live 2026-07-11). Strip them for that route; routed providers keep them.
+    let nativeRoute = false;
+    try {
+      const route = routeModel(config, body.model as string);
+      // Settle the wire once so the sampling decision below reads the effective
+      // adapter rather than the provider-wide default (#404).
+      route.provider = resolveWireProtocolOverride(route.providerName, route.modelId, route.provider);
+      if (route.provider.adapter === "openai-responses") {
+        nativeRoute = true;
+        delete body.max_output_tokens;
+        delete body.temperature;
+        delete body.top_p;
+        delete body.stop;
+        delete body.user;
+      }
+      // Estimated-usage adapters (cursor/kiro) report no per-turn input tokens; stash a
+      // request-side estimate so the log's in:0 rows get a floor. NEVER set this for
+      // accurate-usage adapters — the request-log merge is max(reported, estimate) and
+      // would overwrite real usage (audit 133 R1#7).
+      if (route.provider.adapter === "cursor" || route.provider.adapter === "kiro") {
+        const raw = anthropicBody as Rec;
+        const parts: string[] = [];
+        if (raw.system !== undefined) parts.push(typeof raw.system === "string" ? raw.system : JSON.stringify(raw.system));
+        if (raw.messages !== undefined) parts.push(JSON.stringify(raw.messages));
+        if (raw.tools !== undefined) parts.push(JSON.stringify(raw.tools));
+        logCtx.usageLogInputTokens = Math.max(1, estimateTokens(parts.join("\n"), requestedModel));
+      }
+      // Effort safety valve (devlog 136 B6, audit 139 R2#2): opus-shaped aliases make
+      // every routed model look like a reasoning model to Claude clients, so a forced
+      // effort (CLAUDE_CODE_ALWAYS_ENABLE_EFFORT) would leak reasoning params to routes
+      // that affirmatively expose NO effort control. Strip only on a definitive [] from
+      // supportedLadderFor; unknown (undefined) passes through untouched.
+      if (body.reasoning !== undefined) {
+        const { supportedLadderFor } = await import("./effort-policy");
+        const ladder = supportedLadderFor({ provider: route.provider, modelId: route.modelId });
+        if (ladder !== undefined && ladder.length === 0) delete body.reasoning;
+      }
+    } catch { /* unknown model: let handleResponses shape the 404 */ }
+
+    const headers = new Headers({ "content-type": "application/json" });
+    for (const name of FORWARD_HEADERS) {
+      // The caller's bearer is the proxy admission token (ocx claude placeholder), never a
+      // ChatGPT credential — forwarding it upstream turns into {"detail":"Unauthorized"}.
+      if (name === "authorization") continue;
+      const value = req.headers.get(name);
+      if (value) headers.set(name, value);
+    }
+    if (!nativeRoute) {
+      // Routed replays need main ChatGPT auth so OpenAI-backed sidecars remain reachable.
+      const { getMainAccountToken } = await import("../codex/main-account");
+      const token = getMainAccountToken();
+      if (token) {
+        headers.set("authorization", `Bearer ${token.accessToken}`);
+        headers.set("chatgpt-account-id", token.chatgptAccountId);
+      }
+    }
+    if (nativeRoute) {
+      // No forwarded ChatGPT auth exists on this surface. Attach the main codex login
+      // (read-only auth.json token); account-pool rotation still overrides downstream.
+      const { getMainAccountToken } = await import("../codex/main-account");
+      const token = getMainAccountToken();
+      if (token) {
+        headers.set("authorization", `Bearer ${token.accessToken}`);
+        headers.set("chatgpt-account-id", token.chatgptAccountId);
+      }
+      // ChatGPT-backend prompt-cache affinity rides the session_id HEADER (codex
+      // clients always send their session uuid; devlog 090 follow-up: body-level
+      // prompt_cache_key alone still yielded cached_tokens:0). Claude Code never sends
+      // the header, so synthesize a stable per-session uuid from the same cache key —
+      // but ONLY for a real per-session key (metadata.user_id). The system-hash fallback
+      // key is shared across Desktop conversations, and a shared session_id's backend
+      // semantics are unproven (audit 133 R2#3): body prompt_cache_key only there.
+      if (t.cacheKeySource === "metadata" && !headers.has("session_id") && typeof body.prompt_cache_key === "string") {
+        headers.set("session_id", uuidFromHex(body.prompt_cache_key));
+      }
+    }
+    const internalReq = new Request("http://localhost/v1/responses", {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
+    });
+
+    return handleResponses(internalReq, buildClaudeReplayConfig(config), logCtx, {
+      abortSignal: req.signal,
+      ...(logIds ? { onFirstOutput: () => recordFirstOutput(logCtx, logIds.start) } : {}),
+      onNativePassthroughTerminal: status => finalizeNativeLog(httpStatusForTerminalStatus(status), { terminalStatus: status, closeReason: "terminal" }),
+      onNativePassthroughCancel: () => finalizeNativeLog(499, { closeReason: "client_cancel" }),
+    });
+  }
+
+  // Reactive failover: pick a candidate from the chain (if one applies), replay, and
+  // on a PRE-STREAM 429/401/403/5xx cool that candidate and re-pick, up to maxHops.
+  // No chain configured for this model -> resolveClaudeRoute returns null and this
+  // degrades to the legacy single-replay path (routeKey stays null; loop breaks after
+  // one iteration). A hop never inspects/consumes the response body, so it can only
+  // ever happen before the client sees a byte of a streamed reply.
+  const { maxHops } = normalizeRouting(config.claudeCode?.routing);
+  let upstream: Response | undefined;
+  for (let hop = 0; hop < maxHops; hop++) {
+    const snapshot = buildRouteSnapshot(config, liveRouteHealthSources(config));
+    let routeKey: string | null;
+    try {
+      const route = resolveClaudeRoute(canonicalId, config, snapshot);
+      routeKey = route?.routeKey ?? null;
+    } catch (e) {
+      if (e instanceof NoHealthyRouteError) {
+        if (logIds) addFinalRequestLog(logIds.requestId, logIds.start, logCtx, 429, { closeReason: "non_stream" });
+        return anthropicErrorResponse(429, `No healthy provider for hard-pinned '${e.provider}'`, "rate_limit_error");
+      }
+      throw e;
+    }
+    upstream = await attemptReplay(routeKey);
+    // No chain applies (legacy path): single attempt, never hops.
+    if (!routeKey) break;
+    const s = upstream.status;
+    const hoppable = s === 429 || s === 401 || s === 403 || (s >= 500 && s <= 599);
+    if (!hoppable) break;
+    const raHeader = upstream.headers.get("retry-after");
+    const raSec = raHeader ? Number.parseInt(raHeader, 10) : NaN;
+    const retryAfterMs = Number.isFinite(raSec) && raSec > 0 ? raSec * 1000 : undefined;
+    const { ttlMs, source } = ttlForStatus(s, { retryAfterMs });
+    coolCandidate(routeKey, source, ttlMs);
+  }
+  if (!upstream) {
+    // Unreachable: normalizeRouting clamps maxHops to a minimum of 1, so the loop
+    // above always runs at least once.
+    throw new Error("claude replay loop produced no upstream response");
+  }
   const response = logIds ? responseWithDeferredRequestLog(upstream, logIds.requestId, logIds.start, logCtx) : upstream;
 
   if (!response.ok) {
