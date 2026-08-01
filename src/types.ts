@@ -440,6 +440,25 @@ export interface OcxClaudeCodeConfig {
   desktopProfile?: OcxClaudeDesktopProfile;
   /** Auto-reconcile Desktop 3P config when provider catalog changes. Default: enabled. */
   desktopAutoApply?: boolean;
+  /** Per-model provider failover chains + manual pin (Claude Code inbound only). */
+  routing?: OcxClaudeCodeRouting;
+}
+
+export interface OcxClaudeRouteCandidate {
+  provider: string;
+  model: string;
+}
+
+/** Per-model provider failover for Claude Code inbound (/v1/messages). */
+export interface OcxClaudeCodeRouting {
+  /** Proactive skip when a candidate's quota% >= this. Default 90. */
+  threshold?: number;
+  /** Max candidate tries within one request. Default 3. */
+  maxHops?: number;
+  /** canonical inbound id (post date-strip) -> ordered candidates, first = primary. */
+  chains?: Record<string, OcxClaudeRouteCandidate[]>;
+  /** Manual override; soft = preference (still hops), hard = lock. null/absent = auto. */
+  pin?: { provider: string; hard: boolean } | null;
 }
 
 export type OcxClaudeDesktopFamily = "opus" | "fable" | "sonnet" | "haiku";
