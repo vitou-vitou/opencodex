@@ -20,3 +20,8 @@ devlog/
 # Test-generated artifacts
 tests/.tmp-*/
 .claude/
+
+# stray files a broad 'git add' swept in (not part of the product)
+.idea/amazonq.xml
+ddd/
+/*.png
