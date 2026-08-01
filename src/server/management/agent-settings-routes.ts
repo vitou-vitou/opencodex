@@ -48,6 +48,10 @@ import {
   type DebugFlag,
 } from "../../lib/debug-settings";
 import type { OcxClaudeCodeConfig, OcxConfig, OcxCustomModel, OcxProviderConfig } from "../../types";
+import { getRoutePin, setRoutePin } from "../../claude/route-pin";
+import { normalizeRouting, candidateKey } from "../../claude/route-chains";
+import { activeCooldowns } from "../../claude/route-cooldowns";
+import { buildRouteSnapshot, liveRouteHealthSources } from "../../claude/route-health";
 import { drainAndShutdown } from "../lifecycle";
 import { filterRequestLogs, getRequestLogEntries, type RequestLogEntry } from "../request-log";
 import { estimateComboCost, estimateRequestCost, normalizeCostTokens, tokensPerSecond } from "../../usage/cost";
@@ -69,6 +73,49 @@ function queueGrokApply<T>(run: () => Promise<T>): Promise<T> {
   return next;
 }
 import type { ManagementContext } from "./context";
+
+/**
+ * Claude Code provider-failover management endpoints: manual pin (PUT) and a read-only
+ * status snapshot (GET) combining the configured chains, live health, and active cooldowns.
+ * Extracted as a standalone, directly-testable helper (takes the live config explicitly
+ * rather than reloading it) that the dispatcher below wires in alongside the other
+ * `/api/claude-code` branches. Returns null for any other pathname so the dispatcher falls
+ * through to its remaining routes.
+ */
+export async function handleClaudeRouteRequest(config: OcxConfig, req: Request, url: URL): Promise<Response | null> {
+  if (url.pathname === "/api/claude/route/pin" && req.method === "PUT") {
+    const body = await req.json().catch(() => ({})) as { provider?: string | null; hard?: boolean };
+    const pin = body.provider ? { provider: body.provider, hard: body.hard === true } : null;
+    setRoutePin(config, pin);
+    return jsonResponse({ pin: getRoutePin(config) });
+  }
+  if (url.pathname === "/api/claude/route/status" && req.method === "GET") {
+    const routing = config.claudeCode?.routing;
+    const { threshold, maxHops } = normalizeRouting(routing);
+    const snapshot = buildRouteSnapshot(config, liveRouteHealthSources(config));
+    const cooldowns = activeCooldowns(snapshot.now);
+    const chains = routing?.chains ?? {};
+    const candidates = Object.entries(chains).flatMap(([id, chain]) =>
+      chain.map(c => {
+        const key = candidateKey(c);
+        const h = snapshot.health(c);
+        const cooldown = cooldowns[key];
+        return {
+          id,
+          provider: c.provider,
+          model: c.model,
+          quotaPercent: h.quotaPercent ?? null,
+          needsReauth: h.needsReauth,
+          cooledUntil: cooldown?.until ?? null,
+          healthy: !cooldown && h.usable && !h.needsReauth
+            && !(typeof h.quotaPercent === "number" && h.quotaPercent >= threshold),
+        };
+      }),
+    );
+    return jsonResponse({ threshold, maxHops, pin: getRoutePin(config), chains, candidates });
+  }
+  return null;
+}
 
 export async function handleAgentSettingsRoutes(ctx: ManagementContext): Promise<Response | null> {
   const { req, url, config, deps, refreshCodexCatalogBestEffort, syncClaudeAgentDefsBestEffort } = ctx;
@@ -586,6 +633,11 @@ export async function handleAgentSettingsRoutes(ctx: ManagementContext): Promise
       return jsonResponse({ error: error instanceof Error ? error.message : String(error) }, 400);
     }
   }
+
+  // Claude Code provider-failover pin + status (scoped to /api/claude/route/*, so this
+  // cannot shadow the /api/claude-code and /api/claude-desktop branches above/below it).
+  const claudeRoute = await handleClaudeRouteRequest(config, req, url);
+  if (claudeRoute) return claudeRoute;
 
   // Claude Code inbound settings (GUI "Claude ON" toggle + Claude page).
   if (url.pathname === "/api/claude-code" && req.method === "GET") {
