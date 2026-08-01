@@ -1004,6 +1004,15 @@ switch (command) {
       process.exitCode = await handleClaudeConfigCommand(args.slice(2));
       break;
     }
+    if (args[1] === "route") {
+      const { handleClaudeRouteCommand } = await import("./claude-route");
+      process.exit(await handleClaudeRouteCommand(args.slice(2)));
+    }
+    if (args[1] === "use") {
+      const { handleClaudeRouteCommand } = await import("./claude-route");
+      // `ocx claude use <provider>` is sugar for `ocx claude route use <provider>`.
+      process.exit(await handleClaudeRouteCommand(["use", ...args.slice(2)]));
+    }
     process.exit(await cmdClaude(args.slice(1)));
   }
   case "codex": {
