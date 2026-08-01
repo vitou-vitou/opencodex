@@ -33,4 +33,29 @@ describe("route pin", () => {
     expect(c.claudeCode?.routing?.pin ?? null).toBeNull();
     expect(saved).toHaveLength(1);
   });
+  test("setRoutePin preserves sibling routing fields", () => {
+    saved.length = 0;
+    const seedRouting = {
+      chains: { "claude-opus-4-8": [{ provider: "anthropic", model: "claude-opus-4-8" }] },
+      threshold: 80,
+    };
+    const c = setRoutePin(cfg(seedRouting), { provider: "kiro", hard: true });
+    expect(c.claudeCode?.routing?.pin).toEqual({ provider: "kiro", hard: true });
+    expect(c.claudeCode?.routing?.chains).toEqual(seedRouting.chains);
+    expect(c.claudeCode?.routing?.threshold).toEqual(seedRouting.threshold);
+    expect(saved).toHaveLength(1);
+  });
+  test("setRoutePin(null) preserves sibling routing fields", () => {
+    saved.length = 0;
+    const seedRouting = {
+      chains: { "claude-opus-4-8": [{ provider: "anthropic", model: "claude-opus-4-8" }] },
+      threshold: 80,
+      pin: { provider: "old", hard: false },
+    };
+    const c = setRoutePin(cfg(seedRouting), null);
+    expect(c.claudeCode?.routing?.pin ?? null).toBeNull();
+    expect(c.claudeCode?.routing?.chains).toEqual(seedRouting.chains);
+    expect(c.claudeCode?.routing?.threshold).toEqual(seedRouting.threshold);
+    expect(saved).toHaveLength(1);
+  });
 });
