@@ -10,6 +10,7 @@ import {
   type DesktopProfile,
 } from "../claude/desktop-profile";
 import { writeDesktop3pConfig, type Desktop3pConfigMode, parseDesktop3pModeArgs } from "../claude/desktop-3p";
+import { ensureRecommendedFamilyChains } from "../claude/route-chains";
 import { filterCatalogVisibleModels, visibleNativeSlugs } from "../codex/catalog";
 import { buildClaudeDesktopState, fetchAllModels } from "../server/management-api";
 import { findLiveProxy } from "../server/proxy-liveness";
@@ -28,9 +29,10 @@ function printDesktopHelp(): void {
   ocx claude desktop import <path> [--apply]`);
 }
 
-async function applyProfile(profile: DesktopProfile, mode: Desktop3pConfigMode): Promise<{ ok: boolean; path: string; reason?: string }> {
+async function applyProfile(profile: DesktopProfile, mode: Desktop3pConfigMode): Promise<{ ok: boolean; path: string; reason?: string; chainsAdded: string[] }> {
   const config = loadConfig();
   const state = await buildClaudeDesktopState(config, profile);
+  const { added: chainsAdded } = ensureRecommendedFamilyChains(config);
   config.claudeCode = { ...(config.claudeCode ?? {}), desktopProfile: state.profile };
   saveConfigPreservingClaudeCode(config);
   const live = await findLiveProxy();
@@ -48,7 +50,7 @@ async function applyProfile(profile: DesktopProfile, mode: Desktop3pConfigMode):
     mode,
     state.profile,
   );
-  return { ok: result.written, path: result.path, reason: result.reason };
+  return { ok: result.written, path: result.path, reason: result.reason, chainsAdded };
 }
 
 export async function handleClaudeDesktopCommand(argv: string[]): Promise<number> {
@@ -75,6 +77,9 @@ export async function handleClaudeDesktopCommand(argv: string[]): Promise<number
       const result = await applyProfile(state.profile, parsedMode.mode);
       if (!result.ok) { console.error(`설정 적용 실패: ${result.reason ?? "unknown error"}`); return 1; }
       console.log(`Claude Desktop 설정을 적용했습니다: ${result.path}`);
+      if (result.chainsAdded.length > 0) {
+        console.log(`Recommended failover chains added: ${result.chainsAdded.join(", ")}`);
+      }
       console.log("Claude Desktop을 완전히 종료한 뒤 다시 열어 주세요.");
       return 0;
     } catch (error) {

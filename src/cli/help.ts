@@ -185,6 +185,7 @@ const helpEntries: Record<string, HelpEntry> = {
       "  ocx claude use <provider> [--hard]                 Pin Claude Code routing to a provider (soft/hard)",
       "  ocx claude use auto                                Clear the pin (auto-failover)",
       "  ocx claude route status                            Show chains, pin, live health, cooldowns",
+      "  ocx claude route ensure-chains [--replace]         Merge arena-ranked family chains (kiro+xai); --replace overwrites",
       "  ocx claude route clear-cooldowns                   Reset live route cooldowns",
       "",
       "Claude Code settings: ocx claude config <status|set> ...",

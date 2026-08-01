@@ -455,7 +455,11 @@ export interface OcxClaudeCodeRouting {
   threshold?: number;
   /** Max candidate tries within one request. Default 3. */
   maxHops?: number;
-  /** canonical inbound id (post date-strip) -> ordered candidates, first = primary. */
+  /**
+   * Inbound model id → ordered candidates (first = primary).
+   * Keys may be a client id (optionally date-stripped) or a Desktop family
+   * (`opus` | `sonnet` | `haiku` | `fable`). Lookup tries exact → family → date-strip.
+   */
   chains?: Record<string, OcxClaudeRouteCandidate[]>;
   /** Manual override; soft = preference (still hops), hard = lock. null/absent = auto. */
   pin?: { provider: string; hard: boolean } | null;

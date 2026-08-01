@@ -360,6 +360,13 @@ id/name; именованный `tool_choice` без имени.
 `PUT /api/claude-code` — частичное обновление, пропущенные поля сохраняются; `null` сбрасывает
 значения context/blocklist/compact-window.
 
+## Отказоустойчивость провайдеров
+
+Через `claudeCode.routing.chains` запросы `/v1/messages` можно по очереди направлять на
+несколько апстримов. Ключи семейств Desktop (`opus` / `sonnet` / `haiku` / `fable`),
+рекомендуемый шаблон по рейтингу arena.ai и `ocx claude route ensure-chains [--replace]` описаны в английской
+документации: [Provider failover](/guides/claude-code/#provider-failover).
+
 ## Устранение неполадок
 
 **Claude Code пишет «Did 0 searches»** — текущие сборки преобразуют завершённые элементы

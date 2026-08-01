@@ -335,6 +335,13 @@ HMAC 等值标签。**不会存储提示文本、原始对象或跨运行稳定�
 别名和端口。`PUT /api/claude-code` 接受部分更新并保留省略的字段；`null` 会重置
 context/blocklist/compact-window 值。
 
+## 提供商故障转移
+
+可通过 `claudeCode.routing.chains` 让 `/v1/messages` 按顺序切换上游。Desktop 家族键
+（`opus` / `sonnet` / `haiku` / `fable`）、按 arena.ai 排名的推荐链路以及
+`ocx claude route ensure-chains [--replace]` 的完整说明见英文指南
+[Provider failover](/guides/claude-code/#provider-failover)。
+
 ## 故障排除
 
 **Claude Code 显示“Did 0 searches”**——当前版本会把已完成的 Responses

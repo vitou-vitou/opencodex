@@ -580,9 +580,9 @@ export async function handleClaudeMessages(
   }
 
   const requestedModel = (anthropicBody as Rec).model as string;
-  // Canonical id for chain lookup — requestedModel is already [1m]-stripped upstream,
-  // but not alias/modelMap-resolved (chain keys match the raw client-facing id).
-  const canonicalId = requestedModel.replace(/-\d{8}$/, "");
+  // Chain lookup uses the raw client-facing id (resolveClaudeRoute tries exact →
+  // Desktop family keys → date-stripped). Do not pre-strip here: Desktop date aliases
+  // all collapse to claude-opus-4-8 and must hit family keys first.
   // Routed adapters only support streamed turns; each replay attempt forces
   // body.stream = true internally (attemptReplay) and this flag folds the
   // translated Anthropic SSE into a message JSON for non-streaming clients.
@@ -714,7 +714,7 @@ export async function handleClaudeMessages(
     const snapshot = buildRouteSnapshot(config, liveRouteHealthSources(config));
     let routeKey: string | null;
     try {
-      const route = resolveClaudeRoute(canonicalId, config, snapshot);
+      const route = resolveClaudeRoute(requestedModel, config, snapshot);
       routeKey = route?.routeKey ?? null;
     } catch (e) {
       if (e instanceof NoHealthyRouteError) {

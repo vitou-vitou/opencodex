@@ -376,6 +376,13 @@ role, `tool_use_id` 없는 `tool_result`, id/name 없는 `tool_use`, name 없는
 ID, 별칭, 포트를 반환해요. `PUT /api/claude-code`는 부분 업데이트이며 생략한 필드를 유지해요.
 `null`은 context/blocklist/compact-window 값을 초기화해요.
 
+## 프로바이더 페일오버
+
+`claudeCode.routing.chains`로 `/v1/messages` 요청을 여러 업스트림에 순서대로 넘길 수 있어요.
+Desktop 패밀리 키(`opus` / `sonnet` / `haiku` / `fable`)와 arena.ai 순위 기반 권장 체인·CLI
+(`ocx claude route ensure-chains [--replace]`) 설명은 영어 가이드
+[Provider failover](/guides/claude-code/#provider-failover)를 보세요.
+
 ## 문제 해결
 
 **Claude Code에 "Did 0 searches"가 표시됨** — 현재 버전은 완료된 Responses

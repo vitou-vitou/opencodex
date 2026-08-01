@@ -14,7 +14,7 @@ import { resolveAlias } from "./alias";
 import { stripOneMillionMarker } from "./context-windows";
 import { resolveDesktop3pAlias } from "./desktop-3p";
 import { createHash } from "node:crypto";
-import { chainForModel, normalizeRouting, candidateKey } from "./route-chains";
+import { chainForRequest, normalizeRouting, candidateKey } from "./route-chains";
 import { pickRoute, type RouteSnapshot, type RouteReason } from "./route-selector";
 import { getRoutePin } from "./route-pin";
 
@@ -52,17 +52,19 @@ export function resolveInboundModel(model: string, cc?: OcxClaudeCodeConfig): st
 }
 
 /**
- * Failover route for a canonical Claude id. Returns a `provider/model` route key the
+ * Failover route for an inbound Claude model id. Returns a `provider/model` route key the
  * router resolves directly (router.ts:325), or null when no chain applies (legacy path).
- * Pure: all live state arrives via `snapshot`.
+ * Lookup tries exact id, Desktop family keys (`opus`/`sonnet`/`haiku`/`fable`), then
+ * date-stripped id. Pure aside from Desktop alias registry reads: live health/cooldown
+ * state arrives via `snapshot`.
  */
 export function resolveClaudeRoute(
-  canonicalId: string,
+  requestedModel: string,
   config: OcxConfig,
   snapshot: RouteSnapshot,
 ): { routeKey: string; reason: RouteReason } | null {
   const routing = config.claudeCode?.routing;
-  const chain = chainForModel(routing, canonicalId);
+  const chain = chainForRequest(routing, requestedModel, config);
   if (!chain) return null;
   const { threshold } = normalizeRouting(routing);
   const pin = getRoutePin(config);

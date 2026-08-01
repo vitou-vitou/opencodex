@@ -1,7 +1,13 @@
-import { loadConfig } from "../config";
+import { loadConfig, saveConfigPreservingClaudeCode } from "../config";
 import { setRoutePin, getRoutePin } from "../claude/route-pin";
 import { clearAllCooldowns, activeCooldowns } from "../claude/route-cooldowns";
-import { normalizeRouting } from "../claude/route-chains";
+import {
+  normalizeRouting,
+  ensureRecommendedFamilyChains,
+  candidateKey,
+  RECOMMENDED_FAMILY_CHAINS,
+} from "../claude/route-chains";
+import { DESKTOP_FAMILIES } from "../claude/desktop-profile";
 
 export type RouteUseParse =
   | { action: "pin"; provider: string; hard: boolean }
@@ -62,6 +68,30 @@ export async function handleClaudeRouteCommand(args: string[]): Promise<number> 
     return 0;
   }
 
-  console.error("Usage: ocx claude route <use|status|clear-cooldowns>");
+  if (sub === "ensure-chains") {
+    const replace = args.includes("--replace");
+    const unknown = args.slice(1).filter(a => a !== "--replace");
+    if (unknown.length > 0) {
+      console.error("Usage: ocx claude route ensure-chains [--replace]");
+      return 1;
+    }
+    const { added, replaced } = ensureRecommendedFamilyChains(config, replace);
+    if (added.length === 0 && replaced.length === 0) {
+      console.log("Recommended family chains already present (no changes).");
+      console.log("Use --replace to overwrite family keys with the arena-ranked template.");
+      return 0;
+    }
+    saveConfigPreservingClaudeCode(config);
+    if (replaced.length > 0) console.log(`Replaced family chains: ${replaced.join(", ")}`);
+    if (added.length > 0) console.log(`Added recommended family chains: ${added.join(", ")}`);
+    for (const family of DESKTOP_FAMILIES) {
+      if (![...added, ...replaced].includes(family)) continue;
+      const chain = RECOMMENDED_FAMILY_CHAINS[family];
+      console.log(`  ${family}: ${chain.map(candidateKey).join(" -> ")}`);
+    }
+    return 0;
+  }
+
+  console.error("Usage: ocx claude route <use|status|clear-cooldowns|ensure-chains>");
   return 1;
 }

@@ -92,6 +92,7 @@ body-occupancy):
 | --- | --- | --- | --- |
 | `claudeCode.bodyStallSec?` | `number` | `90` | Бюджет неактивности тела нативного passthrough в секундах — тишина по сырым байтам от вышестоящей стороны, пока ожидается чтение, а не общая длительность. Минимум 1. Ровно `0` отключает. |
 | `claudeCode.bodyMaxBytes?` | `number` | `67108864` | Ограничение суммарного размера тела нативного passthrough в байтах (потоковый SSE и буферизованный непотоковый ответ). Ровно `0` отключает. |
+| `claudeCode.routing?` | `OcxClaudeCodeRouting` | unset | Отказоустойчивость провайдеров для `/v1/messages` (ключи семейств Desktop + цепочки). См. англ. [Provider failover](/guides/claude-code/#provider-failover) и [configuration](/reference/configuration/#claudecoderouting-ocxclaudecoderouting). |
 
 ### Управляемые формы записей
 

@@ -553,6 +553,8 @@ export async function handleAgentSettingsRoutes(ctx: ManagementContext): Promise
   if (url.pathname === "/api/claude-desktop/apply" && req.method === "POST") {
     try {
       const state = await buildClaudeDesktopState(config);
+      const { ensureRecommendedFamilyChains } = await import("../../claude/route-chains");
+      const { added: chainsAdded } = ensureRecommendedFamilyChains(config);
       config.claudeCode = { ...(config.claudeCode ?? {}), desktopProfile: state.profile };
       saveConfigPreservingClaudeCode(config);
       const { writeDesktop3pConfig } = await import("../../claude/desktop-3p");
@@ -577,7 +579,7 @@ export async function handleAgentSettingsRoutes(ctx: ManagementContext): Promise
         config.claudeCode = { ...(config.claudeCode ?? {}), desktopProfile: { ...state.profile, appliedFingerprint: result.fingerprint, appliedAt: new Date().toISOString() } };
         saveConfigPreservingClaudeCode(config);
       }
-      return jsonResponse({ ok: true, saved: true, applied: true, path: result.path, fingerprint: result.fingerprint });
+      return jsonResponse({ ok: true, saved: true, applied: true, path: result.path, fingerprint: result.fingerprint, chainsAdded });
     } catch (error) {
       return jsonResponse({ error: error instanceof Error ? error.message : String(error) }, 400);
     }

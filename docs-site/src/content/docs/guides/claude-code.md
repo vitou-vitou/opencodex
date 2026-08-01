@@ -271,7 +271,59 @@ Lookup order: discovery alias → exact id → id with date suffix stripped (`-2
 ## Provider failover
 
 `claudeCode.routing` configures failover chains, thresholds, and pin preferences for redundant upstream
-routing:
+routing.
+
+### Desktop family chains (recommended)
+
+Claude Desktop sends date-encoded 3P aliases (`claude-opus-4-8-2026MMDD`). Prefer chain keys
+`opus` / `sonnet` / `haiku` / `fable` so each Desktop family can fail over independently.
+
+Candidate **priority follows [arena.ai text](https://arena.ai/leaderboard/text) Elo** among models
+reachable on kiro + xai (snapshot 2026-08-01): `grok-4.5` → `glm-5` → `claude-sonnet-4.5` for
+flagship/mid slots; haiku uses the lighter arena band `deepseek-3.2` → `claude-haiku-4.5` →
+`minimax-m2.5`.
+
+Applying a Desktop profile (or running `ocx claude route ensure-chains`) merges this template for
+any **missing** family keys only. Use `ocx claude route ensure-chains --replace` to refresh an
+older template to the arena order:
+
+```json
+{
+  "claudeCode": {
+    "routing": {
+      "chains": {
+        "opus": [
+          {"provider": "xai", "model": "grok-4.5"},
+          {"provider": "kiro", "model": "glm-5"},
+          {"provider": "kiro", "model": "claude-sonnet-4.5"}
+        ],
+        "sonnet": [
+          {"provider": "xai", "model": "grok-4.5"},
+          {"provider": "kiro", "model": "glm-5"},
+          {"provider": "kiro", "model": "claude-sonnet-4.5"}
+        ],
+        "haiku": [
+          {"provider": "kiro", "model": "deepseek-3.2"},
+          {"provider": "kiro", "model": "claude-haiku-4.5"},
+          {"provider": "kiro", "model": "minimax-m2.5"}
+        ],
+        "fable": [
+          {"provider": "xai", "model": "grok-4.5"},
+          {"provider": "kiro", "model": "glm-5"},
+          {"provider": "kiro", "model": "claude-sonnet-4.5"}
+        ]
+      },
+      "threshold": 90,
+      "maxHops": 3,
+      "pin": null
+    }
+  }
+}
+```
+
+### Claude Code model-id chains
+
+You can still key chains by inbound model id (exact or date-stripped), for example:
 
 ```json
 {
@@ -295,9 +347,9 @@ routing:
 
 **Schema:**
 
-- **`chains`** (object): map of canonical inbound model id → ordered array of `{provider, model}` candidates.
-  The first (primary) candidate should be a real Claude host; list lower-tier fallbacks in order (e.g.,
-  semi-compatible models like Grok last). Each hop reuses the same request shape.
+- **`chains`** (object): map of inbound model id **or** Desktop family key → ordered array of
+  `{provider, model}` candidates. The first (primary) candidate should be your preferred host;
+  list lower-tier fallbacks in order (e.g. Grok last). Each hop reuses the same request shape.
 - **`threshold`** (number, default `90`): quota utilization percentage above which a candidate with
   detected quota is skipped proactively (not yet wired for cross-provider quota). Today failover is
   reactive only.
@@ -305,9 +357,15 @@ routing:
 - **`pin`** (object or null): manual override. `{"provider": "xai", "hard": false}` pins soft (still fails
   over); `{"provider": "xai", "hard": true}` locks hard (errors instead of hopping). `null` = auto-failover.
 
-**Lookup order:**
+**Chain key lookup order:**
+1. Exact inbound model id.
+2. Desktop family (`opus` / `sonnet` / `haiku` / `fable`) when the id matches `desktopProfile`
+   (assignment alias or resolved 3P route → family).
+3. Date-stripped id (`-\d{8}$` removed).
+
+**Overall route lookup order:**
 1. Explicit `/model <provider>/<model>` picker route (picker bypass, pre-existing).
-2. Chain selector matching inbound model id → first healthy candidate.
+2. Chain selector (keys above) → first healthy candidate.
 3. `modelMap` rewrite (if configured).
 4. Passthrough (unmapped, original model id).
 
@@ -327,9 +385,9 @@ routing:
 - Soft-pin candidates respect cooldowns; hard-pin candidates fail immediately.
 
 **Proactive quota skip (partial):**
-The `threshold` applies only where per-provider quota data exists (currently Anthropic OAuth only).
-Proactive cross-provider quota mapping is not yet wired; today all failover is reactive (error-driven).
-Set `threshold` to a low value (e.g., `5`) to be aggressive about reactive failures.
+The `threshold` applies only where per-provider quota data exists (currently skewed toward OpenAI /
+Anthropic OAuth paths). Proactive cross-provider quota mapping is not yet wired; today all failover is
+reactive (error-driven).
 
 **CLI management:**
 
@@ -337,8 +395,12 @@ Set `threshold` to a low value (e.g., `5`) to be aggressive about reactive failu
 ocx claude use <provider> [--hard]   # Pin to a provider (soft = preference, still failover)
 ocx claude use auto                  # Clear the pin (auto-failover, no manual lock)
 ocx claude route status              # Show chains, active pin, live health, cooldown TTLs
+ocx claude route ensure-chains [--replace]  # Merge arena-ranked family chains; --replace overwrites
 ocx claude route clear-cooldowns     # Reset all live route cooldowns
 ```
+
+Desktop apply (`ocx claude desktop apply` or the dashboard Apply action) also merges missing
+recommended family chains (does not overwrite; use `ensure-chains --replace` to refresh order).
 
 A soft pin (`--hard` omitted) uses the selected provider but still fails over if it errors. A hard pin
 (`--hard` included) locks the provider and returns an error if it fails.

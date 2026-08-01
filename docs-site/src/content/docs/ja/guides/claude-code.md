@@ -339,6 +339,13 @@ role、`tool_use_id` のない `tool_result`、id/name のない `tool_use`、na
 ID、エイリアス、ポートを返します。`PUT /api/claude-code` は部分更新で省略したフィールドを維持します。
 `null` は context/blocklist/compact-window 値を初期化します。
 
+## プロバイダーフェイルオーバー
+
+`claudeCode.routing.chains` で `/v1/messages` を複数アップストリームへ順に切り替えられます。
+Desktop ファミリーキー（`opus` / `sonnet` / `haiku` / `fable`）、arena.ai 順位ベースの推奨チェーン、
+`ocx claude route ensure-chains [--replace]` の詳細は英語ガイド
+[Provider failover](/guides/claude-code/#provider-failover) を参照してください。
+
 ## トラブルシューティング
 
 **Claude Code に "Did 0 searches" と表示される** — 現在バージョンは完了した Responses

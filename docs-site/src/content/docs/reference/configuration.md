@@ -113,6 +113,20 @@ body-occupancy guard):
 | `claudeCode.bodyMaxBytes?` | `number` | `67108864` | Native passthrough cumulative body byte cap (streamed SSE and buffered non-stream). Exactly `0` disables. |
 | `claudeCode.authMode?` | `"proxy" \| "subscription"` | unset (auto) | How `ANTHROPIC_AUTH_TOKEN` is handled at launch. Unset means auto: opencodex detects Claude auth on every launch and picks subscription when it finds any, proxy when it finds none, and subscription with a warning when it cannot tell. An explicit value is never overridden by detection. See [Claude Code](/guides/claude-code/#auth-mode). |
 | `claudeCode.authModeMigratedAt?` | `string` | unset | Internal one-time marker. Written once when an upgrade pins a pre-`auto` config to `subscription`, so a deliberate subscriber is not silently moved onto the proxy. Do not set by hand. |
+| `claudeCode.routing?` | `OcxClaudeCodeRouting` | unset | Provider failover for `/v1/messages`. See below. |
+
+#### `claudeCode.routing` (`OcxClaudeCodeRouting`)
+
+| Key | Type | Default | Description |
+| --- | --- | --- | --- |
+| `chains?` | `Record<string, {provider, model}[]>` | unset | Ordered failover candidates keyed by inbound model id and/or Desktop family (`opus` / `sonnet` / `haiku` / `fable`). Lookup tries exact id → family → date-stripped id. |
+| `maxHops?` | `number` | `3` | Max candidate tries per request (clamped ≥ 1). |
+| `threshold?` | `number` | `90` | Proactive skip when a candidate reports quota% ≥ this value. Cross-provider quota is only partially wired; failover is primarily reactive (429/401/403/5xx). |
+| `pin?` | `{provider, hard} \| null` | unset | Soft pin prefers a provider but still hops; hard pin locks and errors instead of hopping. |
+
+Install recommended Desktop family chains (arena.ai-ranked kiro + xai) without overwriting
+existing keys via `ocx claude route ensure-chains`, or refresh with `--replace`. Desktop apply
+merges missing keys only. Full guide: [Provider failover](/guides/claude-code/#provider-failover).
 
 ### Managed record shapes
 
