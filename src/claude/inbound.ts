@@ -9,11 +9,14 @@
  *  - thinking.budget_tokens is NEVER forwarded raw; it maps to an effort tier.
  *  - top_k is accepted and silently dropped (no Responses equivalent, CCR parity).
  */
-import type { OcxClaudeCodeConfig } from "../types";
+import type { OcxClaudeCodeConfig, OcxConfig } from "../types";
 import { resolveAlias } from "./alias";
 import { stripOneMillionMarker } from "./context-windows";
 import { resolveDesktop3pAlias } from "./desktop-3p";
 import { createHash } from "node:crypto";
+import { chainForModel, normalizeRouting, candidateKey } from "./route-chains";
+import { pickRoute, type RouteSnapshot, type RouteReason } from "./route-selector";
+import { getRoutePin } from "./route-pin";
 
 export class AnthropicRequestError extends Error {}
 
@@ -46,6 +49,25 @@ export function resolveInboundModel(model: string, cc?: OcxClaudeCodeConfig): st
   const dateless = map[stripped];
   if (typeof dateless === "string" && dateless.length > 0) return dateless;
   return model;
+}
+
+/**
+ * Failover route for a canonical Claude id. Returns a `provider/model` route key the
+ * router resolves directly (router.ts:325), or null when no chain applies (legacy path).
+ * Pure: all live state arrives via `snapshot`.
+ */
+export function resolveClaudeRoute(
+  canonicalId: string,
+  config: OcxConfig,
+  snapshot: RouteSnapshot,
+): { routeKey: string; reason: RouteReason } | null {
+  const routing = config.claudeCode?.routing;
+  const chain = chainForModel(routing, canonicalId);
+  if (!chain) return null;
+  const { threshold } = normalizeRouting(routing);
+  const pin = getRoutePin(config);
+  const pick = pickRoute(chain, pin, snapshot, threshold);
+  return { routeKey: candidateKey(pick), reason: pick.reason };
 }
 
 /** budget_tokens ladder -> Responses reasoning effort (003: real API min is 1024; never forward raw). */
