@@ -268,6 +268,81 @@ entirely). The stub keeps tool call/result pairing intact.
 
 Lookup order: discovery alias → exact id → id with date suffix stripped (`-20250514`) → passthrough.
 
+## Provider failover
+
+`claudeCode.routing` configures failover chains, thresholds, and pin preferences for redundant upstream
+routing:
+
+```json
+{
+  "claudeCode": {
+    "routing": {
+      "chains": {
+        "claude-opus-4-8": [
+          {"provider": "anthropic", "model": "claude-opus-4-8"},
+          {"provider": "kiro", "model": "claude-opus-4-8"},
+          {"provider": "github-copilot", "model": "claude-opus-4-8"},
+          {"provider": "xai", "model": "grok-4.5"}
+        ]
+      },
+      "threshold": 90,
+      "maxHops": 3,
+      "pin": null
+    }
+  }
+}
+```
+
+**Schema:**
+
+- **`chains`** (object): map of canonical inbound model id → ordered array of `{provider, model}` candidates.
+  The first (primary) candidate should be a real Claude host; list lower-tier fallbacks in order (e.g.,
+  semi-compatible models like Grok last). Each hop reuses the same request shape.
+- **`threshold`** (number, default `90`): quota utilization percentage above which a candidate with
+  detected quota is skipped proactively (not yet wired for cross-provider quota). Today failover is
+  reactive only.
+- **`maxHops`** (number, default `3`): maximum failover attempts before returning an error.
+- **`pin`** (object or null): manual override. `{"provider": "xai", "hard": false}` pins soft (still fails
+  over); `{"provider": "xai", "hard": true}` locks hard (errors instead of hopping). `null` = auto-failover.
+
+**Lookup order:**
+1. Explicit `/model <provider>/<model>` picker route (picker bypass, pre-existing).
+2. Chain selector matching inbound model id → first healthy candidate.
+3. `modelMap` rewrite (if configured).
+4. Passthrough (unmapped, original model id).
+
+**Failover triggers** (reactive error-driven):
+
+| Upstream Error | Cooldown TTL | Behavior |
+| --- | --- | --- |
+| 429 (rate limit) | `Retry-After` header or 60s | Skip, cool candidate, hop to next |
+| 401/403 (auth/permission) | 60s | Skip, cool candidate, hop to next |
+| 5xx (server error) | 30s | Skip, cool candidate, hop to next |
+| Network timeout | 30s | Skip, cool candidate, hop to next |
+| All candidates cooled | N/A | Return error (no hop remaining) |
+
+**Stickiness & recovery:**
+- A cooled candidate is skipped until its cooldown expires, preventing flapping.
+- The primary is automatically reclaimed when its cooldown lapses (no manual action required).
+- Soft-pin candidates respect cooldowns; hard-pin candidates fail immediately.
+
+**Proactive quota skip (partial):**
+The `threshold` applies only where per-provider quota data exists (currently Anthropic OAuth only).
+Proactive cross-provider quota mapping is not yet wired; today all failover is reactive (error-driven).
+Set `threshold` to a low value (e.g., `5`) to be aggressive about reactive failures.
+
+**CLI management:**
+
+```bash
+ocx claude use <provider> [--hard]   # Pin to a provider (soft = preference, still failover)
+ocx claude use auto                  # Clear the pin (auto-failover, no manual lock)
+ocx claude route status              # Show chains, active pin, live health, cooldown TTLs
+ocx claude route clear-cooldowns     # Reset all live route cooldowns
+```
+
+A soft pin (`--hard` omitted) uses the selected provider but still fails over if it errors. A hard pin
+(`--hard` included) locks the provider and returns an error if it fails.
+
 ## Sidecar matrix: web search and image understanding
 
 Routed models do not all have the same hosted tools or image support. opencodex fills those gaps
