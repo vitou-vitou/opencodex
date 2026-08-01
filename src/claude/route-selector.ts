@@ -70,6 +70,16 @@ export function pickRoute(
   snapshot: RouteSnapshot,
   threshold: number,
 ): RoutePick {
+  // Hard pin: lock to the pinned provider only, never hop
+  if (pin?.hard) {
+    const pinned = candidates.find(c => c.provider === pin.provider);
+    if (pinned && isHealthy(pinned, snapshot, threshold)) {
+      return { provider: pinned.provider, model: pinned.model, reason: "pinned" };
+    }
+    throw new NoHealthyRouteError(pin.provider);
+  }
+
+  // Soft pin or no pin: standard failover logic
   const ordered = orderForPin(candidates, pin);
   for (let i = 0; i < ordered.length; i++) {
     const c = ordered[i]!;
@@ -80,7 +90,6 @@ export function pickRoute(
       return { provider: c.provider, model: c.model, reason };
     }
   }
-  if (pin?.hard) throw new NoHealthyRouteError(pin.provider);
   const last = ordered[ordered.length - 1]!;
   return { provider: last.provider, model: last.model, reason: "all_cooled" };
 }

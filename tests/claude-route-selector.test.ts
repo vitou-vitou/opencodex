@@ -82,4 +82,20 @@ describe("pickRoute", () => {
     expect(() => pickRoute(CHAIN, { provider: "kiro", hard: true }, s, 90))
       .toThrow(NoHealthyRouteError);
   });
+  test("hard pin with unhealthy pinned provider but healthy other candidate throws (no hop)", () => {
+    const s = snap({}, { "kiro/claude-opus-4.8": true });
+    // anthropic is healthy, but we pinned hard to kiro which is cooled
+    // Must throw, not return anthropic
+    expect(() => pickRoute(CHAIN, { provider: "kiro", hard: true }, s, 90))
+      .toThrow(NoHealthyRouteError);
+  });
+  test("hard pin with healthy pinned provider returns it with reason pinned", () => {
+    const s = snap({
+      "anthropic/claude-opus-4-8": { quotaPercent: 95 },
+      "kiro/claude-opus-4.8": { quotaPercent: 50 },
+    });
+    // kiro is healthy, pinned hard; should return it even though anthropic is first
+    expect(pickRoute(CHAIN, { provider: "kiro", hard: true }, s, 90))
+      .toEqual({ provider: "kiro", model: "claude-opus-4.8", reason: "pinned" });
+  });
 });

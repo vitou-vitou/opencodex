@@ -1,62 +1,90 @@
-# Task 2 Report: Expose redacted recovery state through account DTOs
+﻿# Task 2 Report: Route Cooldown Map & TTL Derivation
 
-## Status
+## Summary
+Successfully implemented a pure in-memory cooldown map with TTL-from-status math for Claude Code provider failover. All tests pass, implementation complete.
 
-Completed. `CodexAuthAccountDto` now includes `quotaHealth` and
-`recoveryEligible` for both main and pool accounts. The API projects health
-from stored quota windows using the configured `autoSwitchThreshold ?? 80` and
-uses Task 1's `canRecoverWithAccount` eligibility rule. Existing OAuth health
-fields and safe DTO fields are unchanged.
+## Files Created
 
-## Commit
+1. **`src/claude/route-cooldowns.ts`** (69 lines)
+   - Exports: `RouteCooldownSource`, `RouteCooldown`, `ttlForStatus()`, `coolCandidate()`, `candidateCooldown()`, `clearCandidateCooldown()`, `clearAllCooldowns()`, `activeCooldowns()`
+   - Self-contained in-memory Map<string, RouteCooldown>
+   - No external dependencies or imports
 
-- `5bf10b0d feat: expose Codex quota recovery state`
+2. **`tests/claude-route-cooldowns.test.ts`** (61 lines)
+   - 10 test cases across two describe blocks
+   - Uses `afterEach(clearAllCooldowns())` for test isolation
+   - Full coverage of TTL derivation and cooldown lifecycle
 
-## Tests and verification
+## TDD Steps & Output
 
-- RED: `bun test tests/codex-auth-api.test.ts` failed as expected because
-  `quotaHealth` and `recoveryEligible` were absent.
-- GREEN: `bun test tests/codex-auth-api.test.ts tests/codex-quota-recovery.test.ts`
-  — 97 passed, 0 failed.
-- `bun x tsc --noEmit` — exited 0.
-- `git diff --check` — no whitespace errors.
+### Step 1: Write failing test
+✓ Created `tests/claude-route-cooldowns.test.ts` with complete test suite
 
-The API regression test asserts the controlling quota window, reset timestamp,
-action, eligibility, masked email, and absence of access token, refresh token,
-raw ChatGPT account ID, and unmasked email in the serialized DTO.
+### Step 2: Run test to verify fail
+```
+$ bun test tests/claude-route-cooldowns.test.ts
+
+# Result: FAIL (module not found)
+Unhandled error: Cannot find module '../src/claude/route-cooldowns'
+
+0 pass
+1 fail
+1 error
+```
+
+### Step 3: Write implementation
+✓ Created `src/claude/route-cooldowns.ts` with all required functions:
+- `ttlForStatus(status, opts?)`: Maps HTTP status to TTL + source
+  - 401/403 → 60s (reauth)
+  - 429 → 60s default, prefers Retry-After, falls back to resetAt
+  - 5xx/0 → 30s (upstream_error)
+- `coolCandidate(key, source, ttlMs, now?)`: Stores/updates cooldown, keeps later expiry
+- `candidateCooldown(key, now?)`: Reads cooldown (null if absent or expired)
+- `clearCandidateCooldown(key)`: Removes one entry
+- `clearAllCooldowns()`: Clears all entries (test isolation)
+- `activeCooldowns(now?)`: Returns filtered non-expired entries
+
+### Step 4: Run test to verify pass
+```
+$ bun test tests/claude-route-cooldowns.test.ts
+
+ 10 pass
+ 0 fail
+ 13 expect() calls
+Ran 10 tests across 1 file. [40.00ms]
+```
+
+### Step 5: Commit
+```
+$ git add src/claude/route-cooldowns.ts tests/claude-route-cooldowns.test.ts
+$ git commit -m "feat(claude): add route cooldown map and TTL derivation"
+
+[vitou/feat/claude-provider-failover 1215c5c9]
+ 2 files changed, 130 insertions(+)
+```
+
+## Commit Details
+- **Hash**: `1215c5c9`
+- **Message**: `feat(claude): add route cooldown map and TTL derivation`
+- **Branch**: `vitou/feat/claude-provider-failover`
+- **Files**: 2 created, 130 lines added
+
+## Test Coverage
+- ✓ TTL defaults (429→60s, 401→60s, 5xx→30s)
+- ✓ Retry-After override for 429
+- ✓ resetAt-derived TTL for 429 when Retry-After absent
+- ✓ Cooldown set/read within TTL
+- ✓ Expired cooldown cleanup
+- ✓ Repeat write idempotence (keeps later until)
+- ✓ Single key + all keys clear operations
+- ✓ Active cooldowns filters expired entries
+
+## Implementation Notes
+- Self-contained: no imports, pure functions with in-memory Map
+- TTL math: `until = now + Math.max(0, ttlMs)` prevents negative expiries
+- Idempotency: `coolCandidate()` compares `existing.until >= until` to keep the later expiry on repeat writes
+- Cleanup: `candidateCooldown()` auto-deletes expired entries during read
+- Source validation: `ttlForStatus()` strictly validates `retryAfterMs` and `resetAt` types before use
 
 ## Concerns
-
-`StoredAccountQuota` currently defines weekly and monthly windows. The local
-adapter also accepts optional 5h and custom windows defensively, but the Codex
-quota store does not currently populate those fields; no store changes were
-made because they are outside Task 2's approved file scope.
-
-## Review follow-up: main cached quota timestamp
-
-### Status
-
-Completed. The main account DTO now uses the timestamp from the main-account
-info cache rather than assigning a fresh timestamp while constructing the DTO.
-As a result, stale cached quota projects as `unknown` with the `refresh`
-action instead of appearing current.
-
-### Commit
-
-- `31f7fcbb fix: preserve main Codex quota timestamp`
-
-### Tests and verification
-
-- RED: `bun test tests/codex-auth-api.test.ts` failed as expected: stale main
-  cached quota was incorrectly reported as current `critical` quota.
-- GREEN: `bun test tests/codex-auth-api.test.ts tests/codex-quota-recovery.test.ts`
-  — 99 passed, 0 failed.
-- `bun x tsc --noEmit` — exited 0.
-- `git diff --check` — no whitespace errors.
-
-Added main-account regression coverage for the controlling quota window,
-switch eligibility, and stale cached quota refresh behavior.
-
-### Concerns
-
-None within Task 2 scope.
+None. Implementation matches spec exactly, all tests pass, code is clean and testable.
