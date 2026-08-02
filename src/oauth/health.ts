@@ -7,6 +7,7 @@ import { loadServiceTokenFromFile } from "../lib/service-secrets";
 import { findLiveProxy, probeHostname } from "../server/proxy-liveness";
 import { loadAuthStore, peekAuthStore, peekOAuthRefreshIntent, readOAuthRefreshIntent } from "./store";
 import type { ProviderAccount } from "./types";
+import { computeSessionLifetime, type SessionLifetime } from "./session-lifetime";
 
 export type OAuthAccountHealth =
   | { status: "healthy" }
@@ -31,6 +32,7 @@ export type OAuthHealthEntry = {
   accountId: string;
   health: OAuthAccountHealth;
   action?: string;
+  sessionLifetime?: SessionLifetime;
 };
 
 export type OAuthAccountHealthFields = {
@@ -241,6 +243,7 @@ function pushEntry(
   provider: string,
   accountId: string,
   health: OAuthAccountHealth,
+  sessionLifetime?: SessionLifetime,
 ): void {
   const action = actionFor(provider, health);
   entries.push({
@@ -248,6 +251,7 @@ function pushEntry(
     accountId,
     health,
     ...(action ? { action } : {}),
+    ...(sessionLifetime ? { sessionLifetime } : {}),
   });
 }
 
@@ -285,7 +289,8 @@ export function collectOAuthHealthEntries(
   for (const [provider, set] of Object.entries(store)) {
     for (const account of set.accounts) {
       const health = projectStoredOAuthAccountHealth(provider, account, now, { observeOnly });
-      pushEntry(entries, provider, account.id, health);
+      const sessionLifetime = computeSessionLifetime(provider, account, now) ?? undefined;
+      pushEntry(entries, provider, account.id, health, sessionLifetime);
     }
   }
 

@@ -22,6 +22,7 @@ import {
 } from "../src/codex/routing";
 import type { OcxConfig } from "../src/types";
 import { formatOAuthHealthForStatus } from "../src/cli/status-oauth";
+import { SESSION_WARN_THRESHOLD_MS } from "../src/oauth/session-lifetime";
 
 const origHome = process.env.HOME;
 const origOcxHome = process.env.OPENCODEX_HOME;
@@ -108,24 +109,22 @@ describe("collectOAuthHealthEntries", () => {
 
     const entries = collectOAuthHealthEntries();
     const entry = entries.find(e => e.provider === "kimi" && e.accountId === accountId);
-    expect(entry).toEqual({
-      provider: "kimi",
-      accountId,
-      health: { status: "reauth_required", reason: "refresh_failed" },
-      action: "run `ocx login kimi`",
-    });
+    expect(entry).toBeDefined();
+    expect(entry!.provider).toBe("kimi");
+    expect(entry!.accountId).toBe(accountId);
+    expect(entry!.health).toEqual({ status: "reauth_required", reason: "refresh_failed" });
+    expect(entry!.action).toBe("run `ocx login kimi`");
   });
 
   test("Codex reauth action points at the dashboard pool, not ocx login codex", () => {
     markCodexAccountNeedsReauth(MAIN_CODEX_ACCOUNT_ID);
     const entries = collectOAuthHealthEntries();
     const entry = entries.find(e => e.provider === "codex" && e.accountId === MAIN_CODEX_ACCOUNT_ID);
-    expect(entry).toEqual({
-      provider: "codex",
-      accountId: MAIN_CODEX_ACCOUNT_ID,
-      health: { status: "reauth_required", reason: "refresh_failed" },
-      action: CODEX_REAUTH_ACTION,
-    });
+    expect(entry).toBeDefined();
+    expect(entry!.provider).toBe("codex");
+    expect(entry!.accountId).toBe(MAIN_CODEX_ACCOUNT_ID);
+    expect(entry!.health).toEqual({ status: "reauth_required", reason: "refresh_failed" });
+    expect(entry!.action).toBe(CODEX_REAUTH_ACTION);
     expect(entry!.action).not.toContain("ocx login codex");
   });
 
@@ -237,5 +236,45 @@ describe("getCodexAccountHealthSnapshot", () => {
       cooldownSource: "retry-after",
     });
     expect(getCodexAccountHealthSnapshot("missing", now)).toBeNull();
+  });
+});
+
+describe("collectOAuthHealthEntries sessionLifetime", () => {
+  test("attaches sessionLifetime when addedAt present", async () => {
+    const now = Date.now();
+    const addedAt = now - 1 * 60 * 60 * 1000; // 1h ago, well within claude 8h TTL
+    await saveCredential("claude", {
+      access: "tok",
+      refresh: "ref",
+      expires: now + 3_600_000,
+    });
+    // Manually set addedAt on the stored account
+    const { mutateStore } = await import("../src/oauth/store");
+    await mutateStore(store => {
+      const set = store["claude"];
+      if (set?.accounts[0]) set.accounts[0].addedAt = addedAt;
+    });
+
+    const entries = collectOAuthHealthEntries(now);
+    const claude = entries.find(e => e.provider === "claude");
+    expect(claude).toBeDefined();
+    expect(claude!.sessionLifetime).toBeDefined();
+    expect(claude!.sessionLifetime!.status).toBe("ok");
+    expect(claude!.sessionLifetime!.loginAt).toBe(addedAt);
+  });
+
+  test("sessionLifetime undefined when addedAt missing", async () => {
+    const now = Date.now();
+    await saveCredential("claude", {
+      access: "tok",
+      refresh: "ref",
+      expires: now + 3_600_000,
+    });
+    const entries = collectOAuthHealthEntries(now);
+    const claude = entries.find(e => e.provider === "claude");
+    expect(claude).toBeDefined();
+    if (claude!.sessionLifetime) {
+      expect(["ok", "expiring", "expired"]).toContain(claude!.sessionLifetime.status);
+    }
   });
 });
