@@ -512,6 +512,14 @@ export interface OcxCustomModel {
   addedAt?: string;
 }
 
+/** Optional ngrok tunnel control (dashboard sidebar toggle + /api/ngrok). */
+export interface OcxNgrokConfig {
+  /** When true, proxy should keep (or resume) an ngrok tunnel to the listen port. */
+  enabled?: boolean;
+  /** Auth token stored in config.json. Prefer NGROK_AUTHTOKEN env in production. Never logged. */
+  authToken?: string;
+}
+
 export interface OcxConfig {
   port: number;
   providers: Record<string, OcxProviderConfig>;
@@ -520,6 +528,8 @@ export interface OcxConfig {
   openaiProviderTierVersion?: 1 | 2;
   /** Claude Code inbound + launcher settings. */
   claudeCode?: OcxClaudeCodeConfig;
+  /** Ngrok public tunnel for the local proxy listen port. */
+  ngrok?: OcxNgrokConfig;
   /**
    * Up to 5 routed model ids ("<provider>/<model>") to feature FIRST in the injected Codex catalog.
    * Codex's spawn_agent only advertises the first 5 routed models, so this picks which 5 appear.

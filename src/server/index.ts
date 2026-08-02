@@ -860,6 +860,13 @@ export function startServer(port?: number) {
   console.log(`   GET  /api/*        → management API`);
   console.log(`   GET  /             → GUI dashboard`);
 
+  // Resume ngrok if the operator left it enabled. Fire-and-forget: never blocks listen.
+  if (config.ngrok?.enabled === true) {
+    import("../ngrok/manager")
+      .then(({ ensureNgrokFromConfig }) => ensureNgrokFromConfig(config, actualPort))
+      .catch(() => {});
+  }
+
   // Prime pool-account quota in the background so the rotation engine has real
   // usage scores from the first routing decision, even when the dashboard is
   // never opened (the common CLI/WSL case). Fire-and-forget: never blocks the

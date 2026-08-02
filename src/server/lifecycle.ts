@@ -9,6 +9,10 @@ let draining = false;
 let _serverRef: ReturnType<typeof Bun.serve> | undefined;
 
 export function setServerRef(server: ReturnType<typeof Bun.serve> | undefined): void { _serverRef = server; }
+export function getServerListenPort(): number | null {
+  const port = _serverRef?.port;
+  return typeof port === "number" && port > 0 ? port : null;
+}
 export function setDraining(value: boolean): void { draining = value; }
 export function registerTurn(ac: AbortController): void { activeTurns.add(ac); }
 export function unregisterTurn(ac: AbortController): void { activeTurns.delete(ac); }
@@ -54,6 +58,12 @@ export async function drainAndShutdown(
 ): Promise<void> {
   const s = server ?? _serverRef;
   draining = true;
+  try {
+    const { stopNgrokProcess } = await import("../ngrok/manager");
+    await stopNgrokProcess();
+  } catch {
+    /* best-effort */
+  }
   const deadline = Date.now() + timeoutMs;
   while (activeTurns.size > 0 && Date.now() < deadline) {
     await Bun.sleep(100);

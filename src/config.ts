@@ -537,6 +537,20 @@ const configSchema = z.object({
       });
     }
   }
+  const ngrok = (config as { ngrok?: unknown }).ngrok;
+  if (ngrok !== undefined) {
+    if (!ngrok || typeof ngrok !== "object" || Array.isArray(ngrok)) {
+      ctx.addIssue({ code: "custom", path: ["ngrok"], message: "ngrok must be an object" });
+    } else {
+      const block = ngrok as { enabled?: unknown; authToken?: unknown };
+      if (block.enabled !== undefined && typeof block.enabled !== "boolean") {
+        ctx.addIssue({ code: "custom", path: ["ngrok", "enabled"], message: "ngrok.enabled must be a boolean" });
+      }
+      if (block.authToken !== undefined && typeof block.authToken !== "string") {
+        ctx.addIssue({ code: "custom", path: ["ngrok", "authToken"], message: "ngrok.authToken must be a string" });
+      }
+    }
+  }
   for (const name of Object.keys(config.providers)) {
     if (!isValidProviderName(name)) {
       ctx.addIssue({

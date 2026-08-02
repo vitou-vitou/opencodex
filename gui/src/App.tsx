@@ -12,9 +12,10 @@ import CodexAuth from "./pages/CodexAuth";
 import ApiKeys from "./pages/ApiKeys";
 import Claude from "./pages/Claude";
 import Grok from "./pages/Grok";
+import Ngrok from "./pages/Ngrok";
 import Startup from "./pages/Startup";
 import ErrorBoundary from "./components/ErrorBoundary";
-import { IconGrid, IconServer, IconBoxes, IconBot, IconList, IconActivity, IconHardDrive, IconKey, IconGithub, IconMenu, IconSun, IconMoon, IconMonitor, IconGlobe, IconPower, IconSparkle, IconX } from "./icons";
+import { IconGrid, IconServer, IconBoxes, IconBot, IconList, IconActivity, IconHardDrive, IconKey, IconGithub, IconMenu, IconSun, IconMoon, IconMonitor, IconGlobe, IconPower, IconSparkle, IconLink, IconX } from "./icons";
 import { useI18n, useT, LOCALES, type Locale, type TKey } from "./i18n/shared";
 import { Select, Switch } from "./ui";
 import { installApiAuthFetch } from "./api";
@@ -40,6 +41,7 @@ const PAGE_TKEY: Record<Page, TKey> = {
   api: "nav.api",
   claude: "nav.claude",
   grok: "nav.grok",
+  ngrok: "nav.ngrok",
 };
 
 const API_BASE = import.meta.env.VITE_API_BASE || "";
@@ -56,6 +58,7 @@ const NAV: { id: Page; tkey: TKey; Icon: typeof IconGrid }[] = [
   { id: "storage", tkey: "nav.storage", Icon: IconHardDrive },
   { id: "api", tkey: "nav.api", Icon: IconGlobe },
   { id: "claude", tkey: "nav.claude", Icon: IconSparkle },
+  { id: "ngrok", tkey: "nav.ngrok", Icon: IconLink },
   { id: "grok", tkey: "nav.grok", Icon: IconBoxes },
 ];
 
@@ -134,6 +137,21 @@ export default function App() {
   const claudeToggleInFlight = useRef(false);
   const [claudeTogglePending, setClaudeTogglePending] = useState(false);
 
+  const fetchNgrokEnabled = useCallback(async (signal: AbortSignal) => {
+    const res = await fetch(`${API_BASE}/api/ngrok`, { signal });
+    const d = await readJsonIfOk<{ enabled?: unknown }>(res);
+    return d && typeof d.enabled === "boolean" ? d.enabled : null;
+  }, []);
+
+  const ngrokPoll = useKeyedClientResource(
+    `app-ngrok:${API_BASE}`,
+    [],
+    fetchNgrokEnabled,
+  );
+  const ngrokEnabled = ngrokPoll.data ?? null;
+  const ngrokToggleInFlight = useRef(false);
+  const [ngrokTogglePending, setNgrokTogglePending] = useState(false);
+
   useEffect(() => {
     if (!navOpen) return;
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setNavOpen(false); };
@@ -180,6 +198,27 @@ export default function App() {
     } finally {
       claudeToggleInFlight.current = false;
       setClaudeTogglePending(false);
+    }
+  };
+
+  const toggleNgrok = async () => {
+    if (ngrokEnabled === null || ngrokToggleInFlight.current) return;
+    ngrokToggleInFlight.current = true;
+    setNgrokTogglePending(true);
+    const next = !ngrokEnabled;
+    setClientResourceData(`app-ngrok:${API_BASE}`, next);
+    try {
+      const res = await fetch(`${API_BASE}/api/ngrok`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled: next }),
+      });
+      if (!res.ok) setClientResourceData(`app-ngrok:${API_BASE}`, !next);
+    } catch {
+      setClientResourceData(`app-ngrok:${API_BASE}`, !next);
+    } finally {
+      ngrokToggleInFlight.current = false;
+      setNgrokTogglePending(false);
     }
   };
   const handleStop = async () => {
@@ -238,7 +277,7 @@ export default function App() {
             one layout, so that filter would have hidden the page permanently.
           */}
           {NAV.map(({ id, tkey, Icon }) => (
-            <div key={id} className={`nav-entry${id === "claude" ? ` nav-entry-claude${page === id ? " active" : ""}` : ""}`}>
+            <div key={id} className={`nav-entry${id === "claude" || id === "ngrok" ? ` nav-entry-${id}${page === id ? " active" : ""}` : ""}`}>
               <button type="button" className={`nav-item${page === id ? " active" : ""}`} data-page={id}
                 onClick={() => {
                   // Deliberate sidebar navigation — push a history entry.
@@ -254,6 +293,14 @@ export default function App() {
                   onClick={() => void toggleClaude()}
                   disabled={claudeTogglePending}
                   label={t("claude.toggleAria")}
+                />
+              )}
+              {id === "ngrok" && ngrokEnabled !== null && (
+                <Switch
+                  on={ngrokEnabled}
+                  onClick={() => void toggleNgrok()}
+                  disabled={ngrokTogglePending}
+                  label={t("ngrok.toggleAria")}
                 />
               )}
             </div>
@@ -308,6 +355,7 @@ export default function App() {
             {page === "codex-auth" && <CodexAuth apiBase={API_BASE} />}
             {page === "api" && <ApiKeys apiBase={API_BASE} />}
             {page === "claude" && <Claude apiBase={API_BASE} />}
+            {page === "ngrok" && <Ngrok apiBase={API_BASE} />}
             {page === "grok" && <Grok apiBase={API_BASE} />}
           </ErrorBoundary>
         </div>

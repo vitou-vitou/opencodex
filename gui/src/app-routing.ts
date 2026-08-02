@@ -15,7 +15,8 @@ export type Page =
   | "codex-auth"
   | "api"
   | "claude"
-  | "grok";
+  | "grok"
+  | "ngrok";
 
 export const VALID_PAGES = new Set<Page>([
   "dashboard",
@@ -31,6 +32,7 @@ export const VALID_PAGES = new Set<Page>([
   "api",
   "claude",
   "grok",
+  "ngrok",
 ]);
 
 export function readPageFromHash(hash?: string): Page {

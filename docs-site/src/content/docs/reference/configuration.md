@@ -31,6 +31,7 @@ differing backup and rewrites known legacy namespaced selected ids to bare ids.
 | --- | --- | --- | --- |
 | `port` | `number` | `10100` | Port the proxy listens on. |
 | `hostname?` | `string` | `"127.0.0.1"` | Bind address. Set `"0.0.0.0"` to expose on the LAN (requires `OPENCODEX_API_AUTH_TOKEN`; see [Remote access](#remote-access) below). |
+| `ngrok?` | `{ enabled?: boolean; authToken?: string }` | — | Optional [ngrok](https://ngrok.com) tunnel for the listen port. Dashboard **Ngrok** sidebar switch calls `GET`/`PUT /api/ngrok`. Prefer `NGROK_AUTHTOKEN` in the environment; `authToken` in config is write-only via the API (never returned). Requires the `ngrok` binary on `PATH`. |
 | `proxy?` | `string` | — | Outbound HTTP(S) proxy URL or `${ENV_VAR}` reference. Applied to `HTTP_PROXY` / `HTTPS_PROXY` when those env vars are unset; loopback stays in `NO_PROXY`. |
 | `providers` | `Record<string, OcxProviderConfig>` | — | Map of provider name → config. |
 | `openaiProviderTierVersion?` | `2` | set by migration | Marks the single option-aware OpenAI projection as complete. |

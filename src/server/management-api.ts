@@ -65,6 +65,7 @@ import { handleAgentSettingsRoutes } from "./management/agent-settings-routes";
 import { handleOauthAccountRoutes } from "./management/oauth-account-routes";
 import { handleComboRoutes } from "./management/combo-routes";
 import { handleSystemRoutes } from "./management/system-routes";
+import { handleNgrokRoutes } from "./management/ngrok-routes";
 import type { ManagementContext } from "./management/context";
 export type { ManagementApiDeps } from "./management/context";
 import { fetchAllModels } from "./management/shared";
@@ -128,6 +129,7 @@ export async function handleManagementAPI(req: Request, url: URL, config: OcxCon
     ??     (await handleProviderRoutes(ctx))
     ??     (await handleModelRoutes(ctx))
     ??     (await handleAgentSettingsRoutes(ctx))
+    ??     (await handleNgrokRoutes(ctx))
     ??     (await handleOauthAccountRoutes(ctx))
     ??     (await handleComboRoutes(ctx))
     ??     (await handleSystemRoutes(ctx));
@@ -153,6 +155,8 @@ export async function handleManagementAPI(req: Request, url: URL, config: OcxCon
     // which is exactly why an intentional stop has to do it here.
     const { stripGrokConfig } = await import("../grok/inject");
     const grok = stripGrokConfig();
+    const { stopNgrokProcess } = await import("../ngrok/manager");
+    await stopNgrokProcess().catch(() => {});
     setTimeout(async () => {
       await drainAndShutdown(undefined, config.shutdownTimeoutMs ?? 5000);
       process.exit(0);

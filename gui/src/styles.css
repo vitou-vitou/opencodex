@@ -264,16 +264,23 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); }
 
 .nav-entry { display: flex; align-items: center; min-width: 0; border-radius: var(--radius-sm); }
 .nav-entry .nav-item { flex: 1 1 auto; min-width: 0; }
-.nav-entry-claude {
+.nav-entry-claude,
+.nav-entry-ngrok {
   padding-right: 2px;
   transition: background var(--motion-fast), color var(--motion-fast);
 }
 .nav-entry-claude:hover,
-.nav-entry-claude.active { background: var(--accent-soft); color: var(--text); }
+.nav-entry-claude.active,
+.nav-entry-ngrok:hover,
+.nav-entry-ngrok.active { background: var(--accent-soft); color: var(--text); }
 .nav-entry-claude .nav-item,
 .nav-entry-claude .nav-item:hover,
-.nav-entry-claude .nav-item.active { width: auto; background: transparent; }
-.nav-entry-claude .switch {
+.nav-entry-claude .nav-item.active,
+.nav-entry-ngrok .nav-item,
+.nav-entry-ngrok .nav-item:hover,
+.nav-entry-ngrok .nav-item.active { width: auto; background: transparent; }
+.nav-entry-claude .switch,
+.nav-entry-ngrok .switch {
   position: relative;
   width: 44px;
   height: 36px;
@@ -281,7 +288,8 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); }
   border-color: transparent;
   background: transparent;
 }
-.nav-entry-claude .switch::before {
+.nav-entry-claude .switch::before,
+.nav-entry-ngrok .switch::before {
   content: "";
   position: absolute;
   top: 10px;
@@ -293,11 +301,16 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); }
   background: var(--raised);
   transition: background var(--motion-normal), border-color var(--motion-normal);
 }
-.nav-entry-claude .switch.on { border-color: transparent; background: transparent; }
-.nav-entry-claude .switch.on::before { border-color: var(--toggle-on-bg); background: var(--toggle-on-bg); }
-.nav-entry-claude .switch .knob { position: absolute; top: 13px; left: 11px; z-index: 1; width: 10px; height: 10px; }
-.nav-entry-claude .switch.on .knob { transform: translateX(12px); }
-.nav-entry-claude .switch:focus-visible { outline: 2px solid var(--accent-ring); outline-offset: 0; }
+.nav-entry-claude .switch.on,
+.nav-entry-ngrok .switch.on { border-color: transparent; background: transparent; }
+.nav-entry-claude .switch.on::before,
+.nav-entry-ngrok .switch.on::before { border-color: var(--toggle-on-bg); background: var(--toggle-on-bg); }
+.nav-entry-claude .switch .knob,
+.nav-entry-ngrok .switch .knob { position: absolute; top: 13px; left: 11px; z-index: 1; width: 10px; height: 10px; }
+.nav-entry-claude .switch.on .knob,
+.nav-entry-ngrok .switch.on .knob { transform: translateX(12px); }
+.nav-entry-claude .switch:focus-visible,
+.nav-entry-ngrok .switch:focus-visible { outline: 2px solid var(--accent-ring); outline-offset: 0; }
 
 .sidebar-foot { margin-top: auto; padding-top: 12px; display: flex; flex-direction: column; gap: 2px; }
 
