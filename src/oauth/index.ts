@@ -486,8 +486,8 @@ export function buildModelsRequest(prov: OcxProviderConfig, apiKey: string | und
   if (effectiveGoogleMode(providerName, effectiveProvider) === "ai-studio") {
     // Generative Language API: API key goes in x-goog-api-key (never Authorization: Bearer),
     // models live under /v1beta (v1 misses preview models), and pageSize maxes at 1000 —
-    // enough to list everything without a pageToken loop. Vertex/antigravity keep the
-    // generic branch (they fall back to their static model lists).
+    // enough to list everything without a pageToken loop. Vertex stays on the generic
+    // branch; google-antigravity sets liveModels: false (CCA has no OpenAI GET /models).
     if (apiKey) headers["x-goog-api-key"] = apiKey;
     return { url: `${effectiveProvider.baseUrl}/v1beta/models?pageSize=1000`, headers };
   }

@@ -192,4 +192,38 @@ describe("live provider model discovery (authority + fallback)", () => {
     expect(liveFetchCount).toBe(0);
     clearModelCache(oauthProvider);
   });
+
+  test("liveModels false uses static seed and never calls fetch", async () => {
+    const staticProvider = "static-catalog-provider";
+    clearModelCache(staticProvider);
+    let liveFetchCount = 0;
+    globalThis.fetch = (async () => {
+      liveFetchCount += 1;
+      return new Response(JSON.stringify({ data: [{ id: "should-not-appear" }] }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    }) as typeof fetch;
+
+    try {
+      const models = await gatherRoutedModels({
+        providers: {
+          [staticProvider]: {
+            baseUrl: "https://example.test/v1",
+            adapter: "openai-chat",
+            authMode: "key",
+            apiKey: "sk-test",
+            liveModels: false,
+            models: ["seed-a", "seed-b"],
+          },
+        },
+      } as unknown as OcxConfig);
+
+      const ids = models.filter(m => m.provider === staticProvider).map(m => m.id).sort();
+      expect(ids).toEqual(["seed-a", "seed-b"]);
+      expect(liveFetchCount).toBe(0);
+    } finally {
+      clearModelCache(staticProvider);
+    }
+  });
 });
