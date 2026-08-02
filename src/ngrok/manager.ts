@@ -5,6 +5,10 @@ export type NgrokStatus = {
   enabled: boolean;
   running: boolean;
   publicUrl: string | null;
+  /** All known public tunnel URLs (https preferred first). */
+  publicUrls: string[];
+  /** Local proxy URL for this listen port. */
+  localUrl: string;
   port: number;
   hasToken: boolean;
   hasBinary: boolean;
@@ -25,6 +29,7 @@ export type NgrokManagerDeps = {
 type RuntimeState = {
   child: ChildProcess | null;
   publicUrl: string | null;
+  lastPublicUrls: string[];
   lastError: string | null;
   listenPort: number | null;
 };
@@ -32,6 +37,7 @@ type RuntimeState = {
 const state: RuntimeState = {
   child: null,
   publicUrl: null,
+  lastPublicUrls: [],
   lastError: null,
   listenPort: null,
 };
@@ -109,17 +115,48 @@ export function resolveNgrokToken(config: OcxConfig, env: NodeJS.ProcessEnv = pr
   return fromConfig || undefined;
 }
 
+function pickPreferredUrl(urls: string[]): string | null {
+  return urls.find(u => u.startsWith("https://")) ?? urls[0] ?? null;
+}
+
+function rememberPublicUrls(urls: string[]): void {
+  if (urls.length === 0) return;
+  state.lastPublicUrls = [...new Set(urls)];
+  state.publicUrl = pickPreferredUrl(state.lastPublicUrls);
+}
+
 export function isNgrokChildRunning(): boolean {
   return !!(state.child && !state.child.killed && state.child.exitCode === null);
 }
 
-export function getNgrokRuntimeSnapshot(config: OcxConfig, listenPort: number, deps: NgrokManagerDeps = resolveDeps()): NgrokStatus {
+export async function getNgrokRuntimeSnapshot(
+  config: OcxConfig,
+  listenPort: number,
+  deps: NgrokManagerDeps = resolveDeps(),
+): Promise<NgrokStatus> {
   const bin = deps.which("ngrok");
   const token = resolveNgrokToken(config, deps.env);
+  let liveUrls: string[] = [];
+  try {
+    liveUrls = await deps.fetchTunnels(deps.inspectorBase);
+  } catch {
+    /* inspector down */
+  }
+  if (liveUrls.length > 0) rememberPublicUrls(liveUrls);
+  const raw = liveUrls.length > 0 ? [...new Set(liveUrls)] : [...state.lastPublicUrls];
+  const https = raw.filter(u => u.startsWith("https://"));
+  const other = raw.filter(u => !u.startsWith("https://"));
+  const publicUrls = [...https, ...other];
+  const publicUrl = pickPreferredUrl(publicUrls);
+  const childRunning = isNgrokChildRunning();
+  // Orphan inspector tunnels count as running only while the feature stays enabled.
+  const running = childRunning || (config.ngrok?.enabled === true && liveUrls.length > 0);
   return {
     enabled: config.ngrok?.enabled === true,
-    running: isNgrokChildRunning(),
-    publicUrl: isNgrokChildRunning() ? state.publicUrl : null,
+    running,
+    publicUrl,
+    publicUrls,
+    localUrl: `http://127.0.0.1:${listenPort}`,
     port: listenPort,
     hasToken: !!token,
     hasBinary: !!bin,
@@ -131,6 +168,7 @@ export async function stopNgrokProcess(): Promise<void> {
   const child = state.child;
   state.child = null;
   state.publicUrl = null;
+  // Keep lastPublicUrls so the dashboard URL list stays copyable after stop.
   if (!child) return;
   try {
     child.kill();
@@ -219,9 +257,14 @@ export async function startNgrokProcess(
     state.lastError = "ngrok started but no public URL appeared (is the local inspector on 127.0.0.1:4040?).";
     return { ok: false, error: state.lastError };
   }
-  state.publicUrl = publicUrl;
+  try {
+    const all = await deps.fetchTunnels(deps.inspectorBase);
+    rememberPublicUrls(all.length > 0 ? all : [publicUrl]);
+  } catch {
+    rememberPublicUrls([publicUrl]);
+  }
   state.lastError = null;
-  return { ok: true, publicUrl };
+  return { ok: true, publicUrl: state.publicUrl ?? publicUrl };
 }
 
 export async function ensureNgrokFromConfig(
@@ -245,6 +288,7 @@ export async function ensureNgrokFromConfig(
 export function resetNgrokManagerForTests(): void {
   state.child = null;
   state.publicUrl = null;
+  state.lastPublicUrls = [];
   state.lastError = null;
   state.listenPort = null;
   testDepsOverride = null;

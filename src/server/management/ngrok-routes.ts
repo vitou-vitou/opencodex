@@ -24,7 +24,7 @@ export async function handleNgrokRoutes(ctx: ManagementContext): Promise<Respons
   const { req, url, config } = ctx;
 
   if (url.pathname === "/api/ngrok" && req.method === "GET") {
-    return jsonResponse(ngrokDto(config, listenPortFor(config)));
+    return jsonResponse(await ngrokDto(config, listenPortFor(config)));
   }
 
   if (url.pathname === "/api/ngrok" && req.method === "PUT") {
@@ -68,7 +68,7 @@ export async function handleNgrokRoutes(ctx: ManagementContext): Promise<Respons
       next.ngrok.enabled = false;
       saveConfig(next);
       Object.assign(config, next);
-      return jsonResponse({ ok: true, ...ngrokDto(next, port) });
+      return jsonResponse({ ok: true, ...(await ngrokDto(next, port)) });
     }
 
     if (wantsEnabled && body.enabled === true) {
@@ -77,7 +77,7 @@ export async function handleNgrokRoutes(ctx: ManagementContext): Promise<Respons
         saveConfig(next);
         Object.assign(config, next);
         return jsonResponse({
-          ...ngrokDto(next, port),
+          ...(await ngrokDto(next, port)),
           error: "Ngrok auth token missing. Set NGROK_AUTHTOKEN or save a token on the Ngrok page.",
         }, 400);
       }
@@ -86,12 +86,12 @@ export async function handleNgrokRoutes(ctx: ManagementContext): Promise<Respons
         next.ngrok.enabled = false;
         saveConfig(next);
         Object.assign(config, next);
-        return jsonResponse({ ...ngrokDto(next, port), error: started.error }, 400);
+        return jsonResponse({ ...(await ngrokDto(next, port)), error: started.error }, 400);
       }
       next.ngrok.enabled = true;
       saveConfig(next);
       Object.assign(config, next);
-      return jsonResponse({ ok: true, ...ngrokDto(next, port) });
+      return jsonResponse({ ok: true, ...(await ngrokDto(next, port)) });
     }
 
     // Token-only update.
@@ -101,7 +101,7 @@ export async function handleNgrokRoutes(ctx: ManagementContext): Promise<Respons
     }
     saveConfig(next);
     Object.assign(config, next);
-    return jsonResponse({ ok: true, ...ngrokDto(loadConfig(), port) });
+    return jsonResponse({ ok: true, ...(await ngrokDto(loadConfig(), port)) });
   }
 
   return null;

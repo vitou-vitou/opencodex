@@ -83,6 +83,8 @@ test("GET /api/ngrok returns status without authToken", async () => {
     expect(d.enabled).toBe(false);
     expect(d.running).toBe(false);
     expect(d.hasToken).toBe(false);
+    expect(typeof d.localUrl).toBe("string");
+    expect(Array.isArray(d.publicUrls)).toBe(true);
     expect("authToken" in d).toBe(false);
   } finally {
     server.stop(true);
@@ -152,10 +154,12 @@ test("PUT /api/ngrok enables with fake spawn seam", async () => {
       body: JSON.stringify({ enabled: true }),
     });
     expect(putOn.status).toBe(200);
-    const onBody = await putOn.json() as { enabled?: boolean; running?: boolean; publicUrl?: string };
+    const onBody = await putOn.json() as { enabled?: boolean; running?: boolean; publicUrl?: string; publicUrls?: string[]; localUrl?: string };
     expect(onBody.enabled).toBe(true);
     expect(onBody.running).toBe(true);
     expect(onBody.publicUrl).toBe("https://demo.ngrok-free.app");
+    expect(onBody.publicUrls).toEqual(["https://demo.ngrok-free.app"]);
+    expect(typeof onBody.localUrl).toBe("string");
     expect(loadConfig().ngrok?.enabled).toBe(true);
 
     const putOff = await fetch(new URL("/api/ngrok", server.url), {

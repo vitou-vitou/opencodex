@@ -74,9 +74,36 @@ test("startNgrokProcess records public URL from inspector", async () => {
   };
   const result = await startNgrokProcess(10100, "tok", deps);
   expect(result).toEqual({ ok: true, publicUrl: "https://abc.ngrok-free.app" });
-  const snap = getNgrokRuntimeSnapshot({ ngrok: { enabled: true, authToken: "tok" } } as OcxConfig, 10100, deps);
+  const snap = await getNgrokRuntimeSnapshot({ ngrok: { enabled: true, authToken: "tok" } } as OcxConfig, 10100, deps);
   expect(snap.running).toBe(true);
   expect(snap.publicUrl).toBe("https://abc.ngrok-free.app");
+  expect(snap.publicUrls).toEqual(["https://abc.ngrok-free.app"]);
+  expect(snap.localUrl).toBe("http://127.0.0.1:10100");
   expect(snap.hasBinary).toBe(true);
   expect(snap.hasToken).toBe(true);
+});
+
+test("getNgrokRuntimeSnapshot keeps last public URLs after stop", async () => {
+  const child = fakeChild();
+  const deps: NgrokManagerDeps = {
+    which: () => "/usr/bin/ngrok",
+    spawnNgrok: () => child,
+    fetchTunnels: async () => ["https://abc.ngrok-free.app", "http://abc.ngrok-free.app"],
+    sleep: async () => {},
+    env: {},
+    inspectorBase: "http://127.0.0.1:4040",
+    readyAttempts: 3,
+    readyDelayMs: 1,
+  };
+  await startNgrokProcess(10100, "tok", deps);
+  await stopNgrokProcess();
+  const afterStop: NgrokManagerDeps = {
+    ...deps,
+    fetchTunnels: async () => [],
+  };
+  const snap = await getNgrokRuntimeSnapshot({ ngrok: { enabled: false } } as OcxConfig, 10100, afterStop);
+  expect(snap.running).toBe(false);
+  expect(snap.publicUrls).toEqual(["https://abc.ngrok-free.app", "http://abc.ngrok-free.app"]);
+  expect(snap.publicUrl).toBe("https://abc.ngrok-free.app");
+  expect(snap.localUrl).toBe("http://127.0.0.1:10100");
 });
