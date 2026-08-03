@@ -21,7 +21,10 @@ import {
   submitManualLoginCode,
   upsertOAuthProvider,
 } from "../../oauth";
-import { removeCredential } from "../../oauth/store";
+import { peekAuthStore, removeCredential } from "../../oauth/store";
+import { computeSessionLifetime, formatTimeLeft } from "../../oauth/session-lifetime";
+import { MASKED_ACCOUNT_FALLBACK } from "../../oauth/health";
+import { maskAccountId } from "../../lib/privacy";
 import { providerDestinationResolvedError } from "../../lib/destination-policy";
 import { isStreamMode } from "../../lib/bun-stream-caps";
 import { enrichProviderFromCatalog, listKeyLoginProviders } from "../../oauth/key-providers";
@@ -63,6 +66,33 @@ import { displayCodexRuntimePath, effortClampAppliesToRuntime, loadLastEffortCla
 import { isPlainRecord, parseDebugLogQuery, tokPerSecondResult, unavailableCostReason, costResult, requestLogDto, stripRegistryOnlyStaticHeaders, fetchAllModels } from "./shared";
 import type { MetricUnavailableReason, TokPerSecondResult, CostEstimateReason, CostResult, MetricSource } from "./shared";
 import type { ManagementContext } from "./context";
+
+interface SessionWarning {
+  provider: string;
+  accountId: string;
+  timeLeftMs: number;
+  label: string;
+}
+
+export function collectSessionWarnings(now = Date.now()): SessionWarning[] {
+  const store = peekAuthStore();
+  const warnings: SessionWarning[] = [];
+  for (const [provider, set] of Object.entries(store)) {
+    const active = set.accounts.find(a => a.id === set.activeAccountId);
+    if (!active) continue;
+    const lifetime = computeSessionLifetime(provider, active, now);
+    if (!lifetime || lifetime.status === "ok") continue;
+    const masked = maskAccountId(active.id) ?? MASKED_ACCOUNT_FALLBACK;
+    const timeStr = formatTimeLeft(lifetime.timeLeftMs);
+    warnings.push({
+      provider,
+      accountId: masked,
+      timeLeftMs: lifetime.timeLeftMs,
+      label: `${provider} ${masked}: ${timeStr}`,
+    });
+  }
+  return warnings;
+}
 
 export async function handleConfigRoutes(ctx: ManagementContext): Promise<Response | null> {
   const { req, url, config, deps, refreshCodexCatalogBestEffort, syncClaudeAgentDefsBestEffort } = ctx;

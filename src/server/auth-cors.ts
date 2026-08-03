@@ -69,7 +69,7 @@ export function isAllowedRequestOrigin(req: Request, config: OcxConfig): boolean
     });
   }
   const origin = req.headers.get("Origin");
-  if (!isApiAuthRequired(config)) {
+  if (!isApiAuthRequiredForRequest(req, config)) {
     if (!isLoopbackRequestHost(req.headers.get("Host"))) return false;
     return !origin || isLoopbackOriginValue(origin) || isExtraAllowedOrigin(origin, config);
   }
@@ -123,6 +123,33 @@ export function isApiAuthRequired(config: OcxConfig): boolean {
   return !isLoopbackHostname(config.hostname);
 }
 
+/** Opt-in: honor `X-Forwarded-Host` when a reverse proxy terminates TLS in front of loopback. */
+export function isTrustProxyEnabled(): boolean {
+  return process.env.OPENCODEX_TRUST_PROXY?.trim() === "1";
+}
+
+/**
+ * Non-loopback hostname from `Host`, or (when `OPENCODEX_TRUST_PROXY=1`) from the
+ * first `X-Forwarded-Host` value. Used to detect public tunnels to a loopback bind.
+ */
+export function requestPublicHostname(req: Request): string | null {
+  const host = parseHttpHost(req.headers.get("Host"));
+  if (host && !isLoopbackHostname(host.hostname)) return host.hostname;
+  if (!isTrustProxyEnabled()) return null;
+  const forwarded = req.headers.get("X-Forwarded-Host")?.split(",")[0]?.trim() ?? null;
+  const parsed = parseHttpHost(forwarded);
+  if (parsed && !isLoopbackHostname(parsed.hostname)) return parsed.hostname;
+  return null;
+}
+
+/**
+ * Auth is required for non-loopback binds, and also when a loopback-bound proxy is
+ * reached via a public Host (or trusted forwarded host) — e.g. ngrok → 127.0.0.1.
+ */
+export function isApiAuthRequiredForRequest(req: Request, config: OcxConfig): boolean {
+  return isApiAuthRequired(config) || requestPublicHostname(req) !== null;
+}
+
 export function assertServerAuthConfig(config: OcxConfig): void {
   if (isApiAuthRequired(config) && !configuredApiAuthToken(config)) {
     throw new Error("OPENCODEX_API_AUTH_TOKEN is required when binding opencodex to a non-loopback hostname");
@@ -162,7 +189,7 @@ export function validateForwardAdmissionCredential(headers: Headers, config: Ocx
 }
 
 export function hasValidApiAuth(req: Request, config: OcxConfig): boolean {
-  if (!isApiAuthRequired(config)) return true;
+  if (!isApiAuthRequiredForRequest(req, config)) return true;
   const actual = req.headers.get("x-opencodex-api-key")?.trim()
     || req.headers.get("authorization")?.replace(/^Bearer\s+/i, "").trim()
     // Anthropic-SDK clients (Claude Code with ANTHROPIC_API_KEY) authenticate via x-api-key.
@@ -183,7 +210,7 @@ export function requireApiAuth(req: Request, config: OcxConfig, kind: "managemen
  * domains can never be confused.
  */
 export function requireResponsesApiAuth(req: Request, config: OcxConfig): Response | null {
-  if (!isApiAuthRequired(config)) return null;
+  if (!isApiAuthRequiredForRequest(req, config)) return null;
   const actual = req.headers.get("x-opencodex-api-key")?.trim();
   if (actual && isProxyAdmissionSecret(actual, config)) return null;
   return formatErrorResponse(401, "authentication_error", "opencodex API key required");

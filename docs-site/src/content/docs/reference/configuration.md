@@ -179,9 +179,37 @@ An `Authorization: Bearer …` header is also accepted. Dashboard-generated `api
 place of the environment token after startup; all candidates are compared in constant time
 (`timingSafeEqual`) to prevent timing side-channels.
 
+### Tunnels (ngrok, Cloudflare Tunnel, etc.)
+
+Tunneling to a **loopback** bind (for example `ngrok http 10100`) keeps `hostname` as `127.0.0.1`,
+but the public `Host` header is non-loopback. opencodex treats that traffic like remote access:
+management and data-plane routes require an admission token even though the process still listens
+on loopback. Local `Host: 127.0.0.1` / `localhost` clients stay open without a token.
+
+Set `OPENCODEX_API_AUTH_TOKEN` (or create a dashboard API key) before sharing a tunnel URL. Example:
+
+```bash
+curl -sS https://YOUR-SUBDOMAIN.ngrok-free.dev/v1/models \
+  -H "x-opencodex-api-key: your-secret-token" \
+  -H "ngrok-skip-browser-warning: 1"
+```
+
+The `ngrok-skip-browser-warning` header bypasses ngrok’s free-tier browser interstitial for API
+clients (any value works). Browsers that already clicked through the interstitial do not need it.
+
+If a reverse proxy terminates TLS and forwards to loopback while leaving `Host` as loopback, set
+`OPENCODEX_TRUST_PROXY=1` so opencodex also honors the first `X-Forwarded-Host` value for this
+check. Leave it unset unless you trust that proxy hop.
+
 :::caution[LAN exposure]
 Binding to `0.0.0.0` exposes your proxy — and all configured provider credentials — to the local
 network. Only do this on trusted networks, and always set a strong `OPENCODEX_API_AUTH_TOKEN`.
+:::
+
+:::caution[Public tunnels]
+A public tunnel URL without an admission token used to leave the management API open when bound to
+loopback. That is closed: public `Host` traffic now requires a token. Never publish an unauthenticated
+tunnel URL.
 :::
 
 ## Providers (`OcxProviderConfig`)

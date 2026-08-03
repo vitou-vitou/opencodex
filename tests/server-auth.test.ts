@@ -32,6 +32,7 @@ import { fakeChatGptJwt } from "./helpers/fake-chatgpt-jwt";
 import { installIsolatedCodexHome, type IsolatedCodexHome } from "./helpers/isolated-codex-home";
 
 const previousApiToken = process.env.OPENCODEX_API_AUTH_TOKEN;
+const previousTrustProxy = process.env.OPENCODEX_TRUST_PROXY;
 const previousOpencodexHome = process.env.OPENCODEX_HOME;
 const originalGlobalFetch = globalThis.fetch;
 const TEST_DIR = join(import.meta.dir, ".tmp-server-auth-test");
@@ -100,6 +101,8 @@ afterEach(() => {
   globalThis.fetch = originalGlobalFetch;
   if (previousApiToken === undefined) delete process.env.OPENCODEX_API_AUTH_TOKEN;
   else process.env.OPENCODEX_API_AUTH_TOKEN = previousApiToken;
+  if (previousTrustProxy === undefined) delete process.env.OPENCODEX_TRUST_PROXY;
+  else process.env.OPENCODEX_TRUST_PROXY = previousTrustProxy;
   if (previousOpencodexHome === undefined) delete process.env.OPENCODEX_HOME;
   else process.env.OPENCODEX_HOME = previousOpencodexHome;
   isolatedCodexHome?.restore();
@@ -283,6 +286,50 @@ describe("server local API auth", () => {
   test("loopback remains allowed even when env token exists", () => {
     process.env.OPENCODEX_API_AUTH_TOKEN = "local-secret";
     expect(hasValidApiAuth(new Request("http://localhost/api/config"), config("127.0.0.1"))).toBe(true);
+  });
+
+  test("public Host on loopback bind requires admission auth", () => {
+    delete process.env.OPENCODEX_API_AUTH_TOKEN;
+    delete process.env.OPENCODEX_TRUST_PROXY;
+    const cfg = config("127.0.0.1");
+    const publicReq = new Request("http://127.0.0.1/api/providers", {
+      headers: { Host: "example.ngrok-free.dev" },
+    });
+    expect(isApiAuthRequired(cfg)).toBe(false);
+    expect(hasValidApiAuth(publicReq, cfg)).toBe(false);
+
+    process.env.OPENCODEX_API_AUTH_TOKEN = "tunnel-secret";
+    expect(hasValidApiAuth(publicReq, cfg)).toBe(false);
+    expect(hasValidApiAuth(new Request("http://127.0.0.1/api/providers", {
+      headers: {
+        Host: "example.ngrok-free.dev",
+        "x-opencodex-api-key": "tunnel-secret",
+      },
+    }), cfg)).toBe(true);
+  });
+
+  test("X-Forwarded-Host is ignored unless OPENCODEX_TRUST_PROXY=1", () => {
+    delete process.env.OPENCODEX_API_AUTH_TOKEN;
+    delete process.env.OPENCODEX_TRUST_PROXY;
+    const cfg = config("127.0.0.1");
+    const spoofed = new Request("http://127.0.0.1/api/providers", {
+      headers: {
+        Host: "127.0.0.1",
+        "X-Forwarded-Host": "evil.example",
+      },
+    });
+    expect(hasValidApiAuth(spoofed, cfg)).toBe(true);
+
+    process.env.OPENCODEX_TRUST_PROXY = "1";
+    expect(hasValidApiAuth(spoofed, cfg)).toBe(false);
+    process.env.OPENCODEX_API_AUTH_TOKEN = "tunnel-secret";
+    expect(hasValidApiAuth(new Request("http://127.0.0.1/api/providers", {
+      headers: {
+        Host: "127.0.0.1",
+        "X-Forwarded-Host": "evil.example",
+        "x-opencodex-api-key": "tunnel-secret",
+      },
+    }), cfg)).toBe(true);
   });
 
   test("CORS preflight permits the opencodex API key header", () => {

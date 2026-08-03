@@ -116,9 +116,33 @@ x-opencodex-api-key: your-secret-token
 也可以使用 `Authorization: Bearer …` header。启动后，仪表盘生成的 `apiKeys` 可代替环境 token。
 所有候选值均用常量时间（`timingSafeEqual`）比较，避免 timing side-channel。
 
+### 隧道（ngrok、Cloudflare Tunnel 等）
+
+把隧道指到 **loopback** 绑定（例如 `ngrok http 10100`）时，`hostname` 仍是 `127.0.0.1`，
+但公网 `Host` 是非 loopback。opencodex 会把这类流量按远程访问处理：即便进程仍监听
+loopback，management 与 data-plane 也需要 admission token。本地 `Host: 127.0.0.1` /
+`localhost` 客户端仍可不带 token。
+
+分享隧道 URL 前请设置 `OPENCODEX_API_AUTH_TOKEN`（或创建仪表盘 API key）。API 客户端示例：
+
+```bash
+curl -sS https://YOUR-SUBDOMAIN.ngrok-free.dev/v1/models \
+  -H "x-opencodex-api-key: your-secret-token" \
+  -H "ngrok-skip-browser-warning: 1"
+```
+
+`ngrok-skip-browser-warning` 用于绕过 ngrok 免费版浏览器 interstitial（任意值即可）。
+若反向代理在 loopback 前终止 TLS 且保留 loopback `Host`，设置 `OPENCODEX_TRUST_PROXY=1`
+以信任首个 `X-Forwarded-Host`；默认不要开启。
+
 :::caution[LAN 暴露]
 绑定到 `0.0.0.0` 会把代理和所有已配置 provider credential 暴露到本地网络。只应在可信网络中
 使用，并始终设置强 `OPENCODEX_API_AUTH_TOKEN`。
+:::
+
+:::caution[公网隧道]
+公网隧道 URL 若无 admission token，在 loopback 绑定时曾会使 management API 处于开放状态。
+现已关闭：公网 `Host` 流量必须带 token。切勿发布未认证的隧道 URL。
 :::
 
 ## Providers（`OcxProviderConfig`）

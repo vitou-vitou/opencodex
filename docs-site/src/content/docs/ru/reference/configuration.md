@@ -143,10 +143,37 @@ x-opencodex-api-key: your-secret-token
 после запуска можно использовать вместо токена из окружения; все кандидаты сравниваются за
 константное время (`timingSafeEqual`) для защиты от атак по времени.
 
+### Туннели (ngrok, Cloudflare Tunnel и т.п.)
+
+Туннель на **loopback**-привязку (например `ngrok http 10100`) оставляет `hostname` как
+`127.0.0.1`, но публичный `Host` — не loopback. opencodex обрабатывает такой трафик как
+удалённый доступ: management и data-plane требуют admission-токен, даже если процесс слушает
+loopback. Локальные клиенты с `Host: 127.0.0.1` / `localhost` по-прежнему работают без токена.
+
+Перед публикацией URL туннеля задайте `OPENCODEX_API_AUTH_TOKEN` (или создайте API-ключ в
+дашборде). Пример для API-клиентов:
+
+```bash
+curl -sS https://YOUR-SUBDOMAIN.ngrok-free.dev/v1/models \
+  -H "x-opencodex-api-key: your-secret-token" \
+  -H "ngrok-skip-browser-warning: 1"
+```
+
+Заголовок `ngrok-skip-browser-warning` обходит browser interstitial бесплатного плана ngrok
+(подойдёт любое значение). Если reverse proxy завершает TLS перед loopback и оставляет
+loopback `Host`, установите `OPENCODEX_TRUST_PROXY=1`, чтобы учитывать первый
+`X-Forwarded-Host`; по умолчанию не включайте.
+
 :::caution[Доступ по LAN]
 Привязка к `0.0.0.0` открывает ваш прокси — и все настроенные учётные данные провайдеров —
 локальной сети. Делайте это только в доверенных сетях и всегда задавайте надёжный
 `OPENCODEX_API_AUTH_TOKEN`.
+:::
+
+:::caution[Публичные туннели]
+Публичный URL туннеля без admission-токена раньше оставлял management API открытым при
+loopback-привязке. Это закрыто: трафик с публичным `Host` требует токен. Не публикуйте
+неаутентифицированные URL туннелей.
 :::
 
 ## Провайдеры (`OcxProviderConfig`)

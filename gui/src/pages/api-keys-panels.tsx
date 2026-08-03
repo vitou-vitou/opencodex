@@ -62,6 +62,7 @@ export function ApiKeysAuthPanel({ claudeCodeEnabled }: { claudeCodeEnabled: boo
         <li>{t("api.authResponses")}</li>
         {claudeCodeEnabled && <li>{t("api.authMessages")}</li>}
         <li>{t("api.authLoopback")}</li>
+        <li>{t("api.authTunnelNgrok")}</li>
       </ul>
       <p className="muted small">{t("api.authBaseUrlNote")}</p>
     </div>
