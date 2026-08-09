@@ -25,4 +25,4 @@
 
 - [x] 5.1 `bun run typecheck` + focused tests
 - [x] 5.2 Aikido scan on first-party edits
-- [ ] 5.3 `bun run privacy:scan` if auth/docs touch credential paths
+- [x] 5.3 `bun run privacy:scan` if auth/docs touch credential paths

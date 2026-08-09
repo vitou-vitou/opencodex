@@ -517,6 +517,7 @@ cd opencodex
 bun install
 bun run dev:proxy    # start the proxy API in dev mode
 bun run dev:gui      # start the dashboard dev server in another terminal
+bun run build:gui    # build the packaged dashboard into gui/dist
 bun x tsc --noEmit   # typecheck
 ```
 

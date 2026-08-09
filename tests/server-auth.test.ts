@@ -630,19 +630,22 @@ describe("server local API auth", () => {
     if (existsSync(TEST_DIR)) rmSync(TEST_DIR, { recursive: true });
     mkdirSync(TEST_DIR, { recursive: true });
     process.env.OPENCODEX_HOME = TEST_DIR;
+    delete process.env.OPENCODEX_API_AUTH_TOKEN;
     saveConfig(config("127.0.0.1"));
 
     const server = startServer(0);
     try {
       const attackerOrigin = `http://attacker.test:${server.port}`;
+      // Tokenless DNS-rebinding used to fail the loopback CORS Host gate (403).
+      // Public Host now requires admission auth first, so the reject is 401.
       const response = await fetch(`http://127.0.0.1:${server.port}/api/config`, {
         headers: {
           host: `attacker.test:${server.port}`,
           origin: attackerOrigin,
         },
       });
-      expect(response.status).toBe(403);
-      expect(await response.json()).toMatchObject({ error: "cross-origin request blocked" });
+      expect(response.status).toBe(401);
+      expect(await response.json()).toMatchObject({ error: "opencodex API key required" });
     } finally {
       await server.stop(true);
     }
