@@ -24,10 +24,8 @@ test("ApiKeys renders the single stacked layout (no layout toggle, no workspace 
   expect(css).not.toContain("styles-apikeys-workspace.css");
   expect(css).not.toContain("styles-claudecode-workspace.css");
   expect(css).toContain(".api-auth-list");
-  expect(css).toContain(".api-test-note--ok");
-  expect(css).toContain(".api-test-note--error");
   expect(src).toContain('className="api-auth-list');
-  expect(src).toContain("api-test-note--ok");
+  expect(src).not.toContain("api-test-note");
 });
 
 test("ApiKeys stacked layout keeps endpoint, generate, keys table, and usage panels", async () => {
@@ -59,8 +57,18 @@ test("ApiKeys stacked layout keeps endpoint, generate, keys table, and usage pan
   expect(between).not.toContain('t("api.usageChatTitle")');
   expect(between).not.toContain('t("api.usageResponsesTitle")');
   expect(src).toContain("gatewayInboundProtocols(claudeCodeEnabled)");
+  const protocolsColIdx = src.indexOf('t("api.colProtocols")');
+  const statusColIdx = src.indexOf('t("api.colStatus")');
+  expect(protocolsColIdx).toBeGreaterThan(-1);
+  expect(statusColIdx).toBeGreaterThan(protocolsColIdx);
   expect(page).toContain("classifyExternalModel(row)");
   expect(page).toContain('from "../api-access-models"');
+  expect(page).toContain("probeModelChatCompletions");
+  expect(page).toContain("startBatch(models)");
+  expect(page).toContain("startBatch(filteredModels)");
+  expect(src).toContain('t("api.testAll")');
+  expect(src).toContain('t("api.testingAll"');
+  expect(src).toContain('t("api.colStatus")');
 
   // Inline per-row delete confirmation, not a workspace detail pane.
   expect(src).toContain("confirmDelete === k.id");

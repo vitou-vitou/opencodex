@@ -10,9 +10,12 @@ import {
 import {
   DEFAULT_ENDPOINTS,
   deriveApiEndpoints,
+  MODEL_TEST_CONCURRENCY,
+  probeModelChatCompletions,
+  runPool,
   type ApiEndpointInfo,
   type ApiKeyEntry,
-  type ModelTestState,
+  type ModelTestEntry,
 } from "./api-keys-utils";
 import {
   ApiKeysAuthPanel,
@@ -50,13 +53,17 @@ export default function ApiKeys({ apiBase }: { apiBase: string }) {
   const [modelsLoadFailed, setModelsLoadFailed] = useState(false);
   const [modelQuery, setModelQuery] = useState("");
   const [copiedModelId, setCopiedModelId] = useState<string | null>(null);
-  const [modelTests, setModelTests] = useState<Record<string, { state: ModelTestState; detail?: string }>>({});
+  const [modelTests, setModelTests] = useState<Record<string, ModelTestEntry>>({});
+  const [batchProgress, setBatchProgress] = useState<{ done: number; total: number } | null>(null);
   const [newName, setNewName] = useState("");
   const [creating, setCreating] = useState(false);
   const [newKey, setNewKey] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const creatingRef = useRef(false);
+  const batchRunningRef = useRef(false);
+  const inFlightRef = useRef(new Set<string>());
+  const autoBatchStartedRef = useRef(false);
 
   const fetchKeys = useCallback(async () => {
     try {
@@ -220,36 +227,54 @@ export default function ApiKeys({ apiBase }: { apiBase: string }) {
     return t("api.protocolChatCompletions");
   };
 
-  const testModel = async (model: ExternalModelRow) => {
+  const applyProbe = useCallback(async (model: ExternalModelRow): Promise<void> => {
     const modelId = externalModelId(model);
+    if (inFlightRef.current.has(modelId)) return;
+    inFlightRef.current.add(modelId);
     setModelTests(current => ({ ...current, [modelId]: { state: "testing" } }));
     try {
-      const res = await fetch(endpoints.chatCompletions, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: modelId,
-          messages: [{ role: "user", content: "ping" }],
-          max_tokens: 1,
-          stream: false,
-        }),
-      });
-      if (!res.ok) {
-        const detail = await res.text();
-        setModelTests(current => ({
-          ...current,
-          [modelId]: { state: "error", detail: detail.slice(0, 160) || String(res.status) },
-        }));
-        return;
-      }
-      setModelTests(current => ({ ...current, [modelId]: { state: "ok" } }));
-    } catch (error) {
-      setModelTests(current => ({
-        ...current,
-        [modelId]: { state: "error", detail: error instanceof Error ? error.message : t("api.testFailed") },
-      }));
+      const entry = await probeModelChatCompletions(
+        endpoints.chatCompletions,
+        modelId,
+        t("api.testFailed"),
+      );
+      setModelTests(current => ({ ...current, [modelId]: entry }));
+    } finally {
+      inFlightRef.current.delete(modelId);
     }
+  }, [endpoints.chatCompletions, t]);
+
+  const startBatch = useCallback(async (list: ExternalModelRow[]) => {
+    if (batchRunningRef.current || list.length === 0) return;
+    batchRunningRef.current = true;
+    setBatchProgress({ done: 0, total: list.length });
+    try {
+      await runPool(list, MODEL_TEST_CONCURRENCY, async (model) => {
+        await applyProbe(model);
+        setBatchProgress(current => (
+          current ? { ...current, done: Math.min(current.total, current.done + 1) } : current
+        ));
+      });
+    } finally {
+      batchRunningRef.current = false;
+      setBatchProgress(null);
+    }
+  }, [applyProbe]);
+
+  const testModel = async (model: ExternalModelRow) => {
+    await applyProbe(model);
   };
+
+  const testAllFiltered = () => {
+    void startBatch(filteredModels);
+  };
+
+  useEffect(() => {
+    if (autoBatchStartedRef.current) return;
+    if (modelsLoading || modelsLoadFailed || models.length === 0) return;
+    autoBatchStartedRef.current = true;
+    void startBatch(models);
+  }, [models, modelsLoading, modelsLoadFailed, startBatch]);
 
   // Subtitle carries two inline <code> chips; split the localized string on both tokens.
   const subtitleParts = t("api.subtitle").split(/\{authHeader\}|\{altHeader\}/);
@@ -297,9 +322,11 @@ export default function ApiKeys({ apiBase }: { apiBase: string }) {
         modelQuery={modelQuery}
         copiedModelId={copiedModelId}
         modelTests={modelTests}
+        batchProgress={batchProgress}
         claudeCodeEnabled={claudeCodeEnabled}
         onModelQueryChange={setModelQuery}
         onCopyModelId={(modelId) => { void copyModelId(modelId); }}
+        onTestAll={testAllFiltered}
         onTestModel={(model) => { void testModel(model); }}
         sourceLabel={sourceLabel}
         protocolLabel={protocolLabel}
