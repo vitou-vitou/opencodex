@@ -21,6 +21,11 @@ devlog/
 tests/.tmp-*/
 .claude/
 
+# Local Cursor/Claude agent skill mirrors and session scratch (never product).
+# Same class of leak as `.claude/` / `.codexclaw/` — see tests/repo-hygiene.test.ts.
+.agents/
+**/.agents/
+
 # stray files a broad 'git add' swept in (not part of the product)
 .idea/amazonq.xml
 ddd/
