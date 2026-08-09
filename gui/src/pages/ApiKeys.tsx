@@ -47,6 +47,7 @@ export default function ApiKeys({ apiBase }: { apiBase: string }) {
   const [endpoints, setEndpoints] = useState<ApiEndpointInfo>(DEFAULT_ENDPOINTS);
   const [claudeCodeEnabled, setClaudeCodeEnabled] = useState(true);
   const [keysLoadFailed, setKeysLoadFailed] = useState(false);
+  const [keysHydrated, setKeysHydrated] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [models, setModels] = useState<ExternalModelRow[]>([]);
   const [modelsLoading, setModelsLoading] = useState(false);
@@ -87,6 +88,9 @@ export default function ApiKeys({ apiBase }: { apiBase: string }) {
       setKeysLoadFailed(false);
     } catch {
       setKeysLoadFailed(true);
+    } finally {
+      // Endpoint derivation finished (success or fail); unlock auto Status batch.
+      setKeysHydrated(true);
     }
   }, [apiBase]);
 
@@ -271,10 +275,11 @@ export default function ApiKeys({ apiBase }: { apiBase: string }) {
 
   useEffect(() => {
     if (autoBatchStartedRef.current) return;
-    if (modelsLoading || modelsLoadFailed || models.length === 0) return;
+    if (!keysHydrated || modelsLoading || modelsLoadFailed || models.length === 0) return;
+    // Mark one-shot only once keys hydrated and we start (or skip empty) with post-keys endpoints.
     autoBatchStartedRef.current = true;
     void startBatch(models);
-  }, [models, modelsLoading, modelsLoadFailed, startBatch]);
+  }, [keysHydrated, models, modelsLoading, modelsLoadFailed, startBatch]);
 
   // Subtitle carries two inline <code> chips; split the localized string on both tokens.
   const subtitleParts = t("api.subtitle").split(/\{authHeader\}|\{altHeader\}/);

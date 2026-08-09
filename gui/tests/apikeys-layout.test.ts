@@ -64,6 +64,9 @@ test("ApiKeys stacked layout keeps endpoint, generate, keys table, and usage pan
   expect(page).toContain("classifyExternalModel(row)");
   expect(page).toContain('from "../api-access-models"');
   expect(page).toContain("probeModelChatCompletions");
+  expect(page).toContain("keysHydrated");
+  expect(page).toContain("setKeysHydrated(true)");
+  expect(page).toContain("!keysHydrated || modelsLoading || modelsLoadFailed || models.length === 0");
   expect(page).toContain("startBatch(models)");
   expect(page).toContain("startBatch(filteredModels)");
   expect(src).toContain('t("api.testAll")');
