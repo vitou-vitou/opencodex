@@ -70,6 +70,10 @@ test("ApiKeys stacked layout keeps endpoint, generate, keys table, and usage pan
   expect(page).toContain("startBatch(models)");
   expect(page).toContain("startBatch(filteredModels)");
   expect(src).toContain('t("api.testAll")');
+  expect(src).toContain("batchProgress");
+  expect(page).toContain("runPool(");
+  expect(page).toContain("MODEL_TEST_CONCURRENCY");
+  expect(page).toContain("autoBatchStartedRef");
   expect(src).toContain('t("api.testingAll"');
   expect(src).toContain('t("api.colStatus")');
 
