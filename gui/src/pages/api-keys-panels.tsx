@@ -9,7 +9,7 @@ import {
   formatCreatedDate,
   type ApiEndpointInfo,
   type ApiKeyEntry,
-  type ModelTestState,
+  type ModelTestEntry,
 } from "./api-keys-utils";
 
 export function ApiKeysEndpointsPanel({
@@ -186,9 +186,11 @@ export function ApiKeysModelsPanel({
   modelQuery,
   copiedModelId,
   modelTests,
+  batchProgress,
   claudeCodeEnabled,
   onModelQueryChange,
   onCopyModelId,
+  onTestAll,
   onTestModel,
   sourceLabel,
   protocolLabel,
@@ -198,10 +200,12 @@ export function ApiKeysModelsPanel({
   modelsLoadFailed: boolean;
   modelQuery: string;
   copiedModelId: string | null;
-  modelTests: Record<string, { state: ModelTestState; detail?: string }>;
+  modelTests: Record<string, ModelTestEntry>;
+  batchProgress: { done: number; total: number } | null;
   claudeCodeEnabled: boolean;
   onModelQueryChange: (value: string) => void;
   onCopyModelId: (modelId: string) => void;
+  onTestAll: () => void;
   onTestModel: (model: ExternalModelRow) => void;
   sourceLabel: (model: ExternalModelRow) => string;
   protocolLabel: (protocol: string) => string;
@@ -212,6 +216,20 @@ export function ApiKeysModelsPanel({
       <div className="api-panel-head">
         <h3 className="panel-title">{t("api.modelsTitle")}</h3>
         <span className="muted mono text-label">{t("api.modelsCount", { count: filteredModels.length })}</span>
+        {batchProgress ? (
+          <span className="muted small mono" aria-live="polite">
+            {t("api.testingAll", { done: batchProgress.done, total: batchProgress.total })}
+          </span>
+        ) : (
+          <button
+            type="button"
+            className="btn btn-sm btn-ghost"
+            disabled={modelsLoading || modelsLoadFailed || filteredModels.length === 0}
+            onClick={onTestAll}
+          >
+            {t("api.testAll")}
+          </button>
+        )}
       </div>
       <p className="muted small">{t("api.modelsSubtitle")}</p>
       <input
@@ -236,13 +254,23 @@ export function ApiKeysModelsPanel({
                 <th>{t("api.colModel")}</th>
                 <th>{t("api.colSource")}</th>
                 <th>{t("api.colProtocols")}</th>
+                <th>{t("api.colStatus")}</th>
                 <th></th>
               </tr>
             </thead>
             <tbody>
               {filteredModels.map(model => {
                 const modelId = externalModelId(model);
-                const testState = modelTests[modelId]?.state ?? "idle";
+                const test = modelTests[modelId];
+                const testState = test?.state ?? "idle";
+                const statusLabel = testState === "idle"
+                  ? "—"
+                  : testState === "testing"
+                    ? "…"
+                    : test?.httpStatus != null
+                      ? String(test.httpStatus)
+                      : t("api.testFailed");
+                const statusTitle = testState === "error" ? test?.detail : undefined;
                 return (
                   <tr key={modelId}>
                     <td>
@@ -253,6 +281,9 @@ export function ApiKeysModelsPanel({
                     </td>
                     <td>{sourceLabel(model)}</td>
                     <td>{gatewayInboundProtocols(claudeCodeEnabled).map(protocolLabel).join(", ")}</td>
+                    <td title={statusTitle}>
+                      <span className="mono">{statusLabel}</span>
+                    </td>
                     <td>
                       <div className="api-model-actions">
                         <button type="button" className="btn btn-sm btn-ghost" onClick={() => { onCopyModelId(modelId); }}>
@@ -267,8 +298,6 @@ export function ApiKeysModelsPanel({
                           {testState === "testing" ? t("api.testingModel") : t("api.testModel")}
                         </button>
                       </div>
-                      {testState === "ok" && <p className="muted small api-test-note api-test-note--ok">{t("api.testSucceeded")}</p>}
-                      {testState === "error" && <p className="muted small api-test-note api-test-note--error">{modelTests[modelId]?.detail ?? t("api.testFailed")}</p>}
                     </td>
                   </tr>
                 );

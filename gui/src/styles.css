@@ -389,10 +389,6 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); }
 .api-auth-list { display: grid; gap: 8px; margin: 0; padding-left: 1.1rem; }
 .api-auth-list li { color: var(--muted); font-size: var(--text-label); }
 .api-model-actions { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.api-test-note { font-size: var(--text-label); }
-.api-test-note--ok { color: var(--green, #22c55e); }
-.api-test-note--error { color: var(--red); }
-
 /* ---- buttons ---- */
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 7px;
@@ -436,6 +432,12 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); }
 /* Flat accent tint + token border (FE-GRADIENT-02: no gradient wash on opaque functional panels) */
 .panel-accent { border-color: color-mix(in srgb, var(--accent) 28%, var(--border)); background: color-mix(in srgb, var(--accent) 5%, var(--surface)); }
 .api-panel { display: flex; flex-direction: column; gap: 10px; overflow: hidden; }
+.api-panel-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
 .api-panel .panel-title { margin: 0; }
 .api-panel .muted { margin: 0; }
 .api-form-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
