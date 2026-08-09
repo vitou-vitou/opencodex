@@ -183,6 +183,7 @@ export function ApiKeysModelsPanel({
   filteredModels,
   modelsLoading,
   modelsLoadFailed,
+  keysHydrated,
   modelQuery,
   copiedModelId,
   modelTests,
@@ -198,6 +199,7 @@ export function ApiKeysModelsPanel({
   filteredModels: ExternalModelRow[];
   modelsLoading: boolean;
   modelsLoadFailed: boolean;
+  keysHydrated: boolean;
   modelQuery: string;
   copiedModelId: string | null;
   modelTests: Record<string, ModelTestEntry>;
@@ -224,7 +226,7 @@ export function ApiKeysModelsPanel({
           <button
             type="button"
             className="btn btn-sm btn-ghost"
-            disabled={modelsLoading || modelsLoadFailed || filteredModels.length === 0}
+            disabled={!keysHydrated || modelsLoading || modelsLoadFailed || filteredModels.length === 0}
             onClick={onTestAll}
           >
             {t("api.testAll")}

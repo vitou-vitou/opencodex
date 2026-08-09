@@ -69,6 +69,12 @@ test("ApiKeys stacked layout keeps endpoint, generate, keys table, and usage pan
   expect(page).toContain("!keysHydrated || modelsLoading || modelsLoadFailed || models.length === 0");
   expect(page).toContain("startBatch(models)");
   expect(page).toContain("startBatch(filteredModels)");
+  expect(page).toContain("Promise<boolean>");
+  expect(page).toContain("if (started) autoBatchStartedRef.current = true");
+  expect(page).toContain("new Map<string, Promise<void>>()");
+  expect(page).toContain("await existing");
+  expect(src).toContain("keysHydrated");
+  expect(src).toContain("!keysHydrated || modelsLoading || modelsLoadFailed || filteredModels.length === 0");
   expect(src).toContain('t("api.testAll")');
   expect(src).toContain("batchProgress");
   expect(page).toContain("runPool(");
