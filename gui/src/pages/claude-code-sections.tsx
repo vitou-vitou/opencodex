@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { IconPlus, IconX } from "../icons";
 import { useT } from "../i18n/shared";
 import { Trans } from "../i18n/provider";
@@ -198,13 +199,72 @@ export function ClaudeCodeSettingsCard({
   );
 }
 
-export function ClaudeCodeQuickstartSection({ manualEnv }: { manualEnv: string }) {
+export function ClaudeCodeQuickstartSection({
+  manualEnv,
+  apiBase,
+  onFailoverApplied,
+}: {
+  manualEnv: string;
+  apiBase?: string;
+  onFailoverApplied?: () => void;
+}) {
   const t = useT();
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
+  const [ok, setOk] = useState(false);
+
+  const applyFailover = async () => {
+    if (!apiBase || busy) return;
+    setBusy(true);
+    setNote(null);
+    try {
+      const res = await fetch(`${apiBase}/api/claude-code/failover-default`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const body = await res.json() as { success?: boolean; opusAlias?: string; error?: string };
+      if (!res.ok || !body.success) throw new Error(body.error || t("claude.failoverDefaultFail"));
+      setOk(true);
+      setNote(body.opusAlias
+        ? t("claude.failoverDefaultOkAlias", { alias: body.opusAlias })
+        : t("claude.failoverDefaultOk"));
+      onFailoverApplied?.();
+    } catch (error) {
+      setOk(false);
+      setNote(error instanceof Error && error.message ? error.message : t("claude.failoverDefaultFail"));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <>
       <div className="h-section">{t("claude.quickstart")}</div>
       <p className="muted text-label" style={{ margin: "0 0 8px" }}><Trans k="claude.quickstartHint" cmd="ocx claude" /></p>
       <pre className="mono card" style={{ padding: "10px 14px", overflowX: "auto", margin: 0 }}>ocx claude</pre>
+      <p className="muted text-label" style={{ margin: "12px 0 8px" }}><Trans k="claude.ideHint" cmd="ocx claude ide apply" /></p>
+      <pre className="mono card" style={{ padding: "10px 14px", overflowX: "auto", margin: 0 }}>ocx claude ide apply</pre>
+
+      <div className="h-section" style={{ marginTop: 16 }}>{t("claude.failoverDefault")}</div>
+      <p className="muted text-label" style={{ margin: "0 0 8px" }}>{t("claude.failoverDefaultDesc")}</p>
+      <div className="row" style={{ gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+        <button
+          type="button"
+          className="btn btn-primary btn-sm"
+          disabled={!apiBase || busy}
+          onClick={() => { void applyFailover(); }}
+        >
+          {busy ? t("common.loading") : t("claude.failoverDefaultApply")}
+        </button>
+        <code className="mono muted text-caption">ocx claude ide failover-default</code>
+      </div>
+      {note && (
+        <p className="text-label" style={{ margin: "8px 0 0", color: ok ? "var(--green)" : "var(--red)" }}>
+          {note}
+        </p>
+      )}
+
       <details style={{ margin: "10px 0 0" }}>
         <summary className="muted text-label" style={{ cursor: "pointer", padding: "2px 2px" }}>{t("claude.manualEnv")}</summary>
         <pre className="mono card text-label" style={{ padding: "10px 14px", overflowX: "auto", margin: "6px 0 0" }}>{manualEnv}</pre>

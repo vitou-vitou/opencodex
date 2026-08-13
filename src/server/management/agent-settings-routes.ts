@@ -642,6 +642,35 @@ export async function handleAgentSettingsRoutes(ctx: ManagementContext): Promise
   if (claudeRoute) return claudeRoute;
 
   // Claude Code inbound settings (GUI "Claude ON" toggle + Claude page).
+  if (url.pathname === "/api/claude-code/failover-default" && req.method === "POST") {
+    let replace = false;
+    try {
+      const body = await req.json() as { replace?: unknown };
+      if (body && typeof body === "object" && body.replace === true) replace = true;
+    } catch {
+      // empty body is fine
+    }
+    const { applyFailoverDefault } = await import("../../claude/failover-default");
+    try {
+      const result = await applyFailoverDefault(config, { replace });
+      return jsonResponse({
+        success: true,
+        added: result.added,
+        replaced: result.replaced,
+        heads: result.heads,
+        opusAlias: result.opusAlias ?? null,
+        ide: {
+          claudeHomeWritten: result.ide?.claudeHomeWritten ?? false,
+          cursorWritten: result.ide?.cursorWritten ?? false,
+          warnings: result.ide?.warnings ?? [],
+        },
+      });
+    } catch (error) {
+      return jsonResponse({
+        error: error instanceof Error ? error.message : "Failover Default apply failed",
+      }, 500);
+    }
+  }
   if (url.pathname === "/api/claude-code" && req.method === "GET") {
     const models = await fetchAllModels(config);
     const { listCatalogNativeSlugs } = await import("../../codex/catalog");

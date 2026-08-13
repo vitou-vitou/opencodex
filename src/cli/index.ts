@@ -999,6 +999,10 @@ switch (command) {
       if (exitCode !== 0) process.exit(exitCode);
       break;
     }
+    if (args[1] === "ide") {
+      const { handleClaudeIdeCommand } = await import("./claude-ide");
+      process.exit(await handleClaudeIdeCommand(args.slice(2)));
+    }
     if (args[1] === "config") {
       const { handleClaudeConfigCommand } = await import("./integrations");
       process.exitCode = await handleClaudeConfigCommand(args.slice(2));

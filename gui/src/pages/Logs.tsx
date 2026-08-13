@@ -3,6 +3,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { useI18n, LOCALES, type TFn } from "../i18n/shared";
 import { formatTokens } from "../format-tokens";
 import { hashLogConversationQuery, matchesLogConversationId } from "../log-conversation-id";
+import { matchesLogStatusFilter, type LogStatusFilter } from "../log-status-filter";
 import { statusCodeInfo } from "../status-codes";
 import { IconX } from "../icons";
 import { modelLabel } from "../model-display";
@@ -312,6 +313,7 @@ export default function Logs({ apiBase }: { apiBase: string }) {
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [detail, setDetail] = useState<LogEntry | null>(null);
   const [surfaceFilter, setSurfaceFilter] = useState<"all" | "claude" | "codex">("all");
+  const [statusFilter, setStatusFilter] = useState<LogStatusFilter>("all");
   const [conversationFilter, setConversationFilter] = useState("");
   const [conversationQueryHash, setConversationQueryHash] = useState<string | undefined>();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -370,9 +372,11 @@ export default function Logs({ apiBase }: { apiBase: string }) {
     return () => { cancelled = true; };
   }, [conversationQuery]);
 
+  const filtersActive = surfaceFilter !== "all" || statusFilter !== "all" || Boolean(conversationQuery);
   const filteredLogs = logs.filter(log => (
     (surfaceFilter === "all"
       || (surfaceFilter === "claude" ? log.surface === "claude" : log.surface !== "claude"))
+    && matchesLogStatusFilter(log.status, statusFilter)
     && (!conversationQuery || matchesLogConversationId(log.conversationId, conversationQuery, conversationQueryHash))
   ));
   const conversationTotals = conversationQuery ? summarizeFilteredLogs(filteredLogs) : null;
@@ -458,6 +462,22 @@ export default function Logs({ apiBase }: { apiBase: string }) {
             </button>
           ))}
         </div>
+        <span className="muted text-control">{t("logs.filter.status.label")}</span>
+        <div className="segmented" role="radiogroup" aria-label={t("logs.filter.status.label")} style={{ display: "inline-flex", borderRadius: "var(--radius-pill)", background: "var(--surface-soft, var(--raised))", padding: 3, gap: 2 }}>
+          {(["all", "2xx", "4xx", "5xx"] as const).map(status => (
+            <button
+              key={status}
+              type="button"
+              role="radio"
+              aria-checked={statusFilter === status}
+              className={`btn btn-sm${statusFilter === status ? " btn-primary" : " btn-ghost"}`}
+              style={{ borderRadius: "var(--radius-pill)", minWidth: 48, padding: "5px 12px", border: "none", background: statusFilter === status ? undefined : "transparent", color: statusFilter === status ? undefined : "var(--muted)" }}
+              onClick={() => setStatusFilter(status)}
+            >
+              {t(`logs.filter.status.${status}`)}
+            </button>
+          ))}
+        </div>
         <label className="muted text-control" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
           {t("logs.filter.conversation.label")}
           <input
@@ -509,7 +529,7 @@ export default function Logs({ apiBase }: { apiBase: string }) {
       ) : loading && logs.length === 0 ? (
         <EmptyState title={t("common.loading")} />
       ) : filteredLogs.length === 0 ? (
-        <EmptyState title={t("logs.noRequests")} />
+        <EmptyState title={t(filtersActive ? "logs.filter.noMatches" : "logs.noRequests")} />
       ) : (
         <>
         <div ref={scrollContainerRef} className="tbl-wrap" style={{ overflowY: "auto", maxHeight: "calc(100vh - 260px)" }}>

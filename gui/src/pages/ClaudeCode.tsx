@@ -130,7 +130,11 @@ export default function ClaudeCode({ apiBase }: { apiBase: string }) {
       <p className="page-sub">{t("claude.subtitle")}</p>
       {status && <Notice tone={ok ? "ok" : "err"}>{status}</Notice>}
       <ClaudeCodeSettingsCard state={state} autoCompactOptions={autoCompactOptions} onStateChange={setState} />
-      <ClaudeCodeQuickstartSection manualEnv={buildManualEnv(state)} />
+      <ClaudeCodeQuickstartSection
+        manualEnv={buildManualEnv(state)}
+        apiBase={apiBase}
+        onFailoverApplied={() => { void load(); }}
+      />
       <SmallFastModelSetting
         value={state.smallFastModel}
         tierHaikuModel={state.tierModels?.haiku}

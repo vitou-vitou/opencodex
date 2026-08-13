@@ -28,6 +28,43 @@ ocx claude
 | `CLAUDE_CODE_MAX_CONTEXT_TOKENS` / `DISABLE_COMPACT` | Legacy context override when `maxContextTokens` is set (conditional) |
 Variables you export yourself always win. Extra arguments pass through: `ocx claude -p "hello"`.
 
+## Cursor IDE (Claude Code chat)
+
+Cursor’s Claude Code panel does **not** inherit the env from `ocx claude`. Persist proxy
+settings once:
+
+```bash
+ocx claude ide apply
+```
+
+This writes:
+
+| Store | Keys |
+| --- | --- |
+| `~/.claude/settings.json` → `env` | `ANTHROPIC_BASE_URL`, gateway discovery, admission token when configured |
+| Cursor User `settings.json` → `claudeCode.environmentVariables` | Same values (when Cursor is installed) |
+
+Then reload the Claude Code panel (or restart Cursor). Inspect with `ocx claude ide show`;
+remove with `ocx claude ide revert`.
+
+Flags: `--claude-home-only` / `--cursor-only` limit which store is written.
+
+### Failover Default (ranked)
+
+Claude Code’s picker **Default** is normally fixed Opus. To point Default at the ranked
+gateway chain head (arena/static family chains) and hop on **failure only**:
+
+```bash
+ocx claude ide failover-default
+```
+
+Or use **Apply ranked Default** on **Claude → Claude Code** in the dashboard. Then reload
+the Claude Code panel. This does **not** rotate models on every HTTP 200.
+
+Keep the proxy running (`ocx start` / dashboard at `http://localhost:10100/`). Pick a routed
+model in `/model` — bare Anthropic ids still need a logged-in `anthropic` OAuth or another
+provider that owns that model.
+
 ## Auth mode
 
 Claude Code needs a token in `ANTHROPIC_AUTH_TOKEN` to talk to a gateway, but setting that
