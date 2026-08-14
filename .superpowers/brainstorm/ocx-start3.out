@@ -1,0 +1,19 @@
+🚀 opencodex proxy running on http://localhost:10100
+   POST /v1/responses → provider translation
+   POST /v1/chat/completions → OpenAI-compatible clients
+   GET  /healthz      → health check
+   GET  /api/*        → management API
+   GET  /             → GUI dashboard
+⚠️ Codex routing NOT injected: config.toml selects the external model_provider "claude-code-router".
+  OpenCodex preserves external provider configuration so existing "claude-code-router" session history stays visible.
+  Configure that provider for Responses passthrough at http://127.0.0.1:10100/v1.
+  For direct injection, switch to the built-in openai provider, remove any user-owned root openai_base_url, and rerun 'ocx start'.
+   Target Codex home: C:\Users\[USER]\.codex
+[opencodex] OAuth refresh started provider=google-antigravity account=account-…ff0b
+[opencodex] OAuth refresh started provider=kimi account=account-…2d06
+[opencodex] Provider model discovery for "ollama" threw Error [urlClass=provider-models, fallback=configured].
+[opencodex] Provider model discovery for "deepseek" omitted configured model ids; dropping them from the authoritative live catalog: deepseek-chat, deepseek-reasoner.
+[opencodex] OAuth credentials rotated and persisted provider=kimi account=account-…2d06
+[opencodex] Provider model discovery for "github-copilot" omitted configured model ids; dropping them from the authoritative live catalog: gpt-4.1-mini, claude-sonnet-4, gemini-2.5-pro.
+[opencodex] OAuth credentials rotated and persisted provider=google-antigravity account=account-…ff0b
+   + Grok Build config updated (~/.grok/config.toml)

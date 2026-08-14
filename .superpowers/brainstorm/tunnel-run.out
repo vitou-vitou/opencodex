@@ -1,0 +1,4 @@
+tunnel=ngrok
+public_url=https://ffaf-157-85-71-254.ngrok-free.app
+auth_header=x-opencodex-api-key: <from %USERPROFILE%\\.opencodex\\admission-token.txt>
+token_file=C:\Users\vitou\.opencodex\admission-token.txt

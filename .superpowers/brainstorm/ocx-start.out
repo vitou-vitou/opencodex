@@ -1,0 +1,12 @@
+🚀 opencodex proxy running on http://localhost:10100
+   POST /v1/responses → provider translation
+   POST /v1/chat/completions → OpenAI-compatible clients
+   GET  /healthz      → health check
+   GET  /api/*        → management API
+   GET  /             → GUI dashboard
+⚠️ Codex routing NOT injected: config.toml selects the external model_provider "claude-code-router".
+  OpenCodex preserves external provider configuration so existing "claude-code-router" session history stays visible.
+  Configure that provider for Responses passthrough at http://127.0.0.1:10100/v1.
+  For direct injection, switch to the built-in openai provider, remove any user-owned root openai_base_url, and rerun 'ocx start'.
+   Target Codex home: C:\Users\[USER]\.codex
+   + Grok Build config updated (~/.grok/config.toml)

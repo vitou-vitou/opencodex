@@ -1,0 +1,3 @@
+✅ Proxy (PID 31420) stopped.
+↩️  External Codex provider "claude-code-router" preserved; no native restore was needed.
+⚠️  Codex/Claude requests through the proxy will fail until it is restarted ('ocx start' or 'ocx service start').

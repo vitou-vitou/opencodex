@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>OpenCodex HTTPS share — brainstorm</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --panel: #1a222c;
+      --ink: #e7eef7;
+      --muted: #8fa3b8;
+      --accent: #3dd6c6;
+      --warn: #f0b429;
+      --bad: #f07178;
+      --ok: #7fd962;
+      --line: #2a3644;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background: radial-gradient(1200px 600px at 10% -10%, #1d3a3a 0%, transparent 50%),
+                  radial-gradient(900px 500px at 100% 0%, #243049 0%, transparent 45%),
+                  var(--bg);
+      color: var(--ink);
+      line-height: 1.45;
+      padding: 2rem 1.25rem 4rem;
+    }
+    .wrap { max-width: 1100px; margin: 0 auto; }
+    h1 { font-size: 1.65rem; margin: 0 0 .35rem; letter-spacing: -.02em; }
+    .sub { color: var(--muted); margin-bottom: 1.75rem; max-width: 62ch; }
+    .badge {
+      display: inline-block; font-size: .75rem; padding: .2rem .55rem;
+      border: 1px solid var(--line); border-radius: 999px; color: var(--accent);
+      margin-bottom: .75rem;
+    }
+    .flow {
+      display: grid; gap: .75rem; margin: 1.5rem 0 2rem;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      align-items: stretch;
+    }
+    .node {
+      background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+      padding: .9rem .85rem; position: relative;
+    }
+    .node strong { display: block; font-size: .95rem; margin-bottom: .25rem; }
+    .node span { color: var(--muted); font-size: .8rem; }
+    .arrow {
+      display: flex; align-items: center; justify-content: center;
+      color: var(--accent); font-weight: 700; font-size: 1.25rem;
+    }
+    @media (max-width: 700px) { .arrow { transform: rotate(90deg); } }
+    .grid {
+      display: grid; gap: 1rem;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    }
+    .card {
+      background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+      padding: 1rem 1.05rem; display: flex; flex-direction: column; gap: .55rem;
+      min-height: 220px;
+    }
+    .card.rec { border-color: var(--accent); box-shadow: 0 0 0 1px rgba(61,214,198,.25); }
+    .card h2 { font-size: 1.05rem; margin: 0; }
+    .pill {
+      align-self: flex-start; font-size: .72rem; text-transform: uppercase;
+      letter-spacing: .04em; padding: .18rem .5rem; border-radius: 6px;
+      background: #24313f; color: var(--muted);
+    }
+    .pill.best { background: rgba(61,214,198,.15); color: var(--accent); }
+    .pill.ok { background: rgba(127,217,98,.12); color: var(--ok); }
+    .pill.warn { background: rgba(240,180,41,.12); color: var(--warn); }
+    .pill.bad { background: rgba(240,113,120,.12); color: var(--bad); }
+    ul { margin: 0; padding-left: 1.1rem; color: var(--muted); font-size: .88rem; }
+    li { margin: .2rem 0; }
+    .verdict {
+      margin-top: 2rem; padding: 1.1rem 1.2rem; border-radius: 14px;
+      background: linear-gradient(135deg, rgba(61,214,198,.12), rgba(36,48,73,.6));
+      border: 1px solid rgba(61,214,198,.35);
+    }
+    .verdict h3 { margin: 0 0 .4rem; }
+    code { font-family: ui-monospace, Consolas, monospace; font-size: .85em;
+      background: #0c1015; padding: .1rem .35rem; border-radius: 4px; }
+    .compare {
+      width: 100%; border-collapse: collapse; margin-top: 1.5rem; font-size: .86rem;
+    }
+    .compare th, .compare td {
+      border-bottom: 1px solid var(--line); padding: .55rem .45rem; text-align: left;
+    }
+    .compare th { color: var(--muted); font-weight: 600; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="badge">Brainstorm · visualization first · no code yet</div>
+    <h1>Can OpenCodex share an HTTPS API?</h1>
+    <p class="sub">
+      Short answer: <strong>yes — already supported</strong>, by putting a TLS tunnel
+      (ngrok / Cloudflare Tunnel / Herd Expose) in front of local
+      <code>http://127.0.0.1:10100</code>. Native TLS inside the Bun proxy is not the
+      product path today. A new Laravel+Herd app is optional only if you want a
+      PHP product layer — not required for HTTPS.
+    </p>
+
+    <h2 style="font-size:1.1rem;margin:0 0 .5rem">Like Warp share — but for an API</h2>
+    <p class="sub" style="margin-top:0">
+      Warp shares a <em>terminal session</em> (human/agent UX). OpenCodex needs to
+      share an <em>OpenAI-compatible HTTPS endpoint</em>. Same “give me a public URL”
+      feeling; different wire.
+    </p>
+
+    <div class="flow">
+      <div class="node"><strong>Client</strong><span>Codex / Claude / Cline / curl</span></div>
+      <div class="arrow">→</div>
+      <div class="node"><strong>HTTPS edge</strong><span>ngrok · cloudflared · herd expose</span></div>
+      <div class="arrow">→</div>
+      <div class="node"><strong>OpenCodex</strong><span>loopback :10100 + admission token</span></div>
+      <div class="arrow">→</div>
+      <div class="node"><strong>Providers</strong><span>Claude · Gemini · DeepSeek…</span></div>
+    </div>
+
+    <div class="grid">
+      <article class="card rec">
+        <span class="pill best">Recommended</span>
+        <h2>A · Tunnel in front of OpenCodex</h2>
+        <ul>
+          <li>Keep OCX as-is (Bun proxy)</li>
+          <li><code>ngrok http 10100</code> or <code>cloudflared tunnel</code></li>
+          <li>Or Herd <code>expose</code> → localhost:10100</li>
+          <li>Set <code>OPENCODEX_API_AUTH_TOKEN</code></li>
+          <li>Docs already cover this</li>
+        </ul>
+      </article>
+      <article class="card">
+        <span class="pill warn">Harder</span>
+        <h2>B · Native HTTPS in OCX</h2>
+        <ul>
+          <li>Add cert/key config to Bun server</li>
+          <li>Cert lifecycle, renewals, SNI…</li>
+          <li>Duplicates what tunnels already do</li>
+          <li>Not needed for “share API”</li>
+        </ul>
+      </article>
+      <article class="card">
+        <span class="pill warn">Only if PHP product</span>
+        <h2>C · New Laravel + Herd</h2>
+        <ul>
+          <li>Herd gives <code>*.test</code> HTTPS locally</li>
+          <li>Expose/Forge for public HTTPS</li>
+          <li>Laravel would be a <em>gateway UI / SaaS shell</em></li>
+          <li>Still reverse-proxy to OCX or reimplement adapters</li>
+        </ul>
+      </article>
+      <article class="card">
+        <span class="pill bad">Wrong layer</span>
+        <h2>D · Warp-style session share</h2>
+        <ul>
+          <li>Great for watching a terminal</li>
+          <li>Does not expose <code>/v1/responses</code></li>
+          <li>Clients cannot point base URL there</li>
+        </ul>
+      </article>
+    </div>
+
+    <table class="compare">
+      <thead>
+        <tr>
+          <th>Need</th>
+          <th>A Tunnel+OCX</th>
+          <th>C Laravel+Herd</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Public HTTPS URL for API</td>
+          <td>Yes (minutes)</td>
+          <td>Yes, but weeks if rebuilding LLM proxy</td>
+        </tr>
+        <tr>
+          <td>Codex / Claude Code routing</td>
+          <td>Native</td>
+          <td>Must proxy to OCX or rewrite</td>
+        </tr>
+        <tr>
+          <td>Pretty Laravel admin / billing</td>
+          <td>No (use OCX GUI)</td>
+          <td>Yes — Herd shines here</td>
+        </tr>
+        <tr>
+          <td>Local <code>https://app.test</code></td>
+          <td>N/A (loopback HTTP fine)</td>
+          <td>Herd strength</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="verdict">
+      <h3>Verdict</h3>
+      <p style="margin:0;color:var(--muted)">
+        Do <strong>not</strong> rewrite OpenCodex in Laravel just for HTTPS.
+        Use <strong>Approach A</strong>. Consider Laravel+Herd only if the goal is a
+        separate product (team portal, keys, billing) that <em>calls</em> OpenCodex
+        over HTTPS — not replaces it.
+      </p>
+    </div>
+  </div>
+</body>
+</html>
